@@ -1,0 +1,10 @@
+.git
+.pytest_cache
+.venv
+__pycache__
+tests
+*.pyc
+deploy/cloudflare/node_modules
+deploy/cloudflare/.wrangler
+deploy/cloudflare/.wrangler-dist
+.DS_Store

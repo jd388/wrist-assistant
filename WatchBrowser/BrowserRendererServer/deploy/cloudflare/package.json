@@ -1,0 +1,26 @@
+{
+  "name": "watchbrowser-cloudflare-container",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "npm run typecheck && npm test && npm run startup-check && npm run dry-run",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "startup-check": "sh -n container-start.sh",
+    "dry-run": "wrangler deploy --dry-run --containers-rollout=none --outdir .wrangler-dist",
+    "container-build": "docker build --platform linux/amd64 -f Dockerfile -t watchbrowser-renderer-cloudflare:local ../..",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy --keep-vars --containers-rollout=immediate"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "0.3.7"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20260828.1",
+    "@types/node": "26.4.0",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11",
+    "wrangler": "4.127.1"
+  }
+}

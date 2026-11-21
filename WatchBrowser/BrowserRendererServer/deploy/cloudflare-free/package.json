@@ -1,0 +1,24 @@
+{
+  "name": "watchbrowser-cloudflare-free",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm test && npm run dry-run",
+    "dry-run": "wrangler deploy --dry-run --outdir .wrangler-dist",
+    "dev": "wrangler dev --remote",
+    "deploy": "wrangler deploy --strict"
+  },
+  "dependencies": {
+    "@cloudflare/playwright": "1.3.6"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20260828.1",
+    "@types/node": "26.4.0",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11",
+    "wrangler": "4.127.1"
+  }
+}

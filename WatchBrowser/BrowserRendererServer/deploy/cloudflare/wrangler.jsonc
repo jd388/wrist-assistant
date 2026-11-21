@@ -1,0 +1,40 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "watchbrowser-renderer",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-29",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "global_fetch_strictly_public"
+  ],
+  "workers_dev": true,
+  "containers": [
+    {
+      "name": "watchbrowser-renderer",
+      "class_name": "WatchBrowserContainer",
+      "image": "./Dockerfile",
+      "image_build_context": "../..",
+      "instance_type": "standard-1",
+      "max_instances": 1
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "RENDERER",
+        "class_name": "WatchBrowserContainer"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["WatchBrowserContainer"]
+    }
+  ],
+  "vars": {
+    "WATCHBROWSER_CHROMIUM_EGRESS_ACK": "disabled",
+    "BROWSER_RENDERER_AI_BASE_URL": "https://api.deepseek.com",
+    "BROWSER_RENDERER_AI_MODEL": "deepseek-v4-flash"
+  }
+}

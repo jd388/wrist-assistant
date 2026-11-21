@@ -1,0 +1,19 @@
+{
+  "name": "English Speller Database",
+  "source": "https://github.com/en-wl/wordlist",
+  "commit": "1e5b7d3a72f47a71da5d28686c1dd4b397178485",
+  "selection": {
+    "size": 70,
+    "spellings": ["A", "B", "Z"],
+    "variantLevel": 1,
+    "regions": ["", "US", "GB"],
+    "excludeAbbreviations": true,
+    "lowercaseLemmasOnly": true
+  },
+  "coverageManifest": {
+    "path": "esdb70_coverage.tsv",
+    "sha256": "f8aca929a81fc6ae811bcd1d70b9fdbf1f10a6552eeccbbbdfcfa219b942e7d0",
+    "lemmas": 88413,
+    "acceptedForms": 170859
+  }
+}

@@ -1,0 +1,613 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A10000000000000000000001 /* WatchBrowserApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000001 /* WatchBrowserApp.swift */; };
+		A10000000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000002 /* ContentView.swift */; };
+		A10000000000000000000006 /* WebAddress.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000006 /* WebAddress.swift */; };
+		A10000000000000000000008 /* WatchRemoteBrowser.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000A /* WatchRemoteBrowser.swift */; };
+		A1000000000000000000000B /* AIChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000D /* AIChatView.swift */; };
+		A1000000000000000000000C /* DirectWebReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000E /* DirectWebReader.swift */; };
+		A1000000000000000000000D /* DirectWebDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000F /* DirectWebDocument.swift */; };
+		A1000000000000000000000E /* GatewayProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000010 /* GatewayProtocol.swift */; };
+		A1000000000000000000000F /* GatewayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000011 /* GatewayClient.swift */; };
+		A10000000000000000000010 /* GatewayTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000012 /* GatewayTokenStore.swift */; };
+		A10000000000000000000011 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000013 /* PrivacyInfo.xcprivacy */; };
+		A10000000000000000000012 /* AIConversation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000014 /* AIConversation.swift */; };
+		A10000000000000000000013 /* AIChatModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000015 /* AIChatModel.swift */; };
+		A10000000000000000000014 /* AIConversationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000016 /* AIConversationStore.swift */; };
+		A10000000000000000000015 /* DeepSeekProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000B /* DeepSeekProtocol.swift */; };
+		A10000000000000000000016 /* DeepSeekKeyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000C /* DeepSeekKeyStore.swift */; };
+		A10000000000000000000017 /* DeepSeekService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000017 /* DeepSeekService.swift */; };
+		A30000000000000000000001 /* WatchBrowserPhoneApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30000000000000000000002 /* WatchBrowserPhoneApp.swift */; };
+		A30000000000000000000002 /* PhoneContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30000000000000000000003 /* PhoneContentView.swift */; };
+		A30000000000000000000003 /* PhoneGatewayStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30000000000000000000004 /* PhoneGatewayStore.swift */; };
+		A30000000000000000000004 /* PhoneSessionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30000000000000000000005 /* PhoneSessionController.swift */; };
+		A30000000000000000000005 /* WatchConnectivityRelayProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30000000000000000000008 /* WatchConnectivityRelayProtocol.swift */; };
+		A30000000000000000000006 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = B30000000000000000000006 /* PrivacyInfo.xcprivacy */; };
+		A30000000000000000000007 /* WatchBrowser.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = B10000000000000000000007 /* WatchBrowser.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		A30000000000000000000008 /* WatchConnectivityRelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30000000000000000000007 /* WatchConnectivityRelayClient.swift */; };
+		A30000000000000000000009 /* WatchConnectivityRelayProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30000000000000000000008 /* WatchConnectivityRelayProtocol.swift */; };
+		A3000000000000000000000A /* PhoneLocalBrowserProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3000000000000000000000A /* PhoneLocalBrowserProtocol.swift */; };
+		A3000000000000000000000B /* PhoneLocalBrowserProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3000000000000000000000A /* PhoneLocalBrowserProtocol.swift */; };
+		A3000000000000000000000C /* PhoneLocalBrowserService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3000000000000000000000B /* PhoneLocalBrowserService.swift */; };
+		A3000000000000000000000D /* PhoneBrowserHostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3000000000000000000000C /* PhoneBrowserHostView.swift */; };
+		A3000000000000000000000E /* PhoneBrowserAcceptanceProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3000000000000000000000D /* PhoneBrowserAcceptanceProbe.swift */; };
+		444B20171A8682082A2AB9F2 /* CancellationAwareSerialGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DD13685F76B2649DF34194A /* CancellationAwareSerialGate.swift */; };
+		0B7203F13BD9C8872A90EB2A /* DeterministicNumberTranslation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79539E2415CEAF120E3898DC /* DeterministicNumberTranslation.swift */; };
+		8593448F5BD04CD94C7ED72E /* DictionaryEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FE5DA25A6C1B52044C4A18A /* DictionaryEntry.swift */; };
+		D4D9D63D03234554F8311B49 /* DictionarySearchEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A8D6C2A3CB1B35B7AD3DBE9 /* DictionarySearchEngine.swift */; };
+		E7D3CB7FC2957B8FE5F141B1 /* ExtendedDictionaryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC056A54585276FE2282AD11 /* ExtendedDictionaryStore.swift */; };
+		EB5316D5747B7BCCA00DE5C5 /* FeaturedExpressionPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DB4FEEE71BE30A70372D972 /* FeaturedExpressionPolicy.swift */; };
+		DEFBD037941F2DB1ED861991 /* LookupRequestGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4022875CA0B99AB5F7B8EF8E /* LookupRequestGate.swift */; };
+		7078F8D18D7437CE380D50B8 /* SearchHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = C294492FF728A8D69B490AE3 /* SearchHistory.swift */; };
+		392549D9EB711B94A16B38F4 /* SentencePieceTokenizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58C2F59B0017D73F436B1D12 /* SentencePieceTokenizer.swift */; };
+		1A3354E833238E5C43384648 /* LexiWatchLookupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA206CEE84F28B4E70CBA219 /* LexiWatchLookupView.swift */; };
+		D65B77AC2BE4EB22F368CADB /* LookupViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34128AD1FD079FEC34E221C6 /* LookupViewModel.swift */; };
+		4D68F284B6BCD1B10DEBA37A /* DictionaryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = E43DA6C4E317201DDADC27EA /* DictionaryRepository.swift */; };
+		63E64077CB791B4AFD25623F /* LocalTranslationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F743D3F4EA10CBD16B9040D2 /* LocalTranslationService.swift */; };
+		9E887572C200F45665000836 /* LocalEnZhDecoder.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 9B9D540008B7430D8E2EA4CE /* LocalEnZhDecoder.mlpackage */; };
+		A720912797AAF01EE169020E /* LocalEnZhEncoder.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 6715FC59068E1F1905BE7D7D /* LocalEnZhEncoder.mlpackage */; };
+		29E8672F1509FAE337AACE32 /* LocalZhEnDecoder.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 720DDADEA81C4940C1B63B36 /* LocalZhEnDecoder.mlpackage */; };
+		CA5F2B16DE4259BF7A572CA6 /* LocalZhEnEncoder.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = C2CB77E1A8EECC8E9E6A74B7 /* LocalZhEnEncoder.mlpackage */; };
+		36011198A519CC951C0BBF1B /* offline_dictionary.json in Resources */ = {isa = PBXBuildFile; fileRef = BE81B2A5E57A7E5693240E32 /* offline_dictionary.json */; };
+		E88DA63323CA6452D284BCF1 /* offline_dictionary_extended.sqlite in Resources */ = {isa = PBXBuildFile; fileRef = 97632FDD523A960EACA183AC /* offline_dictionary_extended.sqlite */; };
+		C52CEC3BED14839165A4E7D9 /* ZhEnTokenizer.spmlex in Resources */ = {isa = PBXBuildFile; fileRef = E0E2F46A612BA07162EA2FDC /* ZhEnTokenizer.spmlex */; };
+		1356077543796BABBB68DCA6 /* EnZhTokenizer.spmlex in Resources */ = {isa = PBXBuildFile; fileRef = A77259DE2E49EB17DFDD0567 /* EnZhTokenizer.spmlex */; };
+		D67FBDA960EB88E65C15ADBA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97B20FBF0FBA59F9278667FF /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		G30000000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E10000000000000000000002 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E10000000000000000000001;
+			remoteInfo = WatchBrowser;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		C30000000000000000000004 /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				A30000000000000000000007 /* WatchBrowser.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		B10000000000000000000001 /* WatchBrowserApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchBrowserApp.swift; sourceTree = "<group>"; };
+		B10000000000000000000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		B10000000000000000000006 /* WebAddress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebAddress.swift; sourceTree = "<group>"; };
+		B10000000000000000000007 /* WatchBrowser.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WatchBrowser.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B10000000000000000000008 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		B1000000000000000000000A /* WatchRemoteBrowser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchRemoteBrowser.swift; sourceTree = "<group>"; };
+		B1000000000000000000000B /* DeepSeekProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepSeekProtocol.swift; sourceTree = "<group>"; };
+		B1000000000000000000000C /* DeepSeekKeyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepSeekKeyStore.swift; sourceTree = "<group>"; };
+		B1000000000000000000000D /* AIChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIChatView.swift; sourceTree = "<group>"; };
+		B1000000000000000000000E /* DirectWebReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectWebReader.swift; sourceTree = "<group>"; };
+		B1000000000000000000000F /* DirectWebDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectWebDocument.swift; sourceTree = "<group>"; };
+		B10000000000000000000010 /* GatewayProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayProtocol.swift; sourceTree = "<group>"; };
+		B10000000000000000000011 /* GatewayClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayClient.swift; sourceTree = "<group>"; };
+		B10000000000000000000012 /* GatewayTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayTokenStore.swift; sourceTree = "<group>"; };
+		B10000000000000000000013 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		B10000000000000000000014 /* AIConversation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIConversation.swift; sourceTree = "<group>"; };
+		B10000000000000000000015 /* AIChatModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIChatModel.swift; sourceTree = "<group>"; };
+		B10000000000000000000016 /* AIConversationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIConversationStore.swift; sourceTree = "<group>"; };
+		B10000000000000000000017 /* DeepSeekService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepSeekService.swift; sourceTree = "<group>"; };
+		B30000000000000000000001 /* WatchBrowserPhone.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WatchBrowserPhone.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B30000000000000000000002 /* WatchBrowserPhoneApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchBrowserPhoneApp.swift; sourceTree = "<group>"; };
+		B30000000000000000000003 /* PhoneContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneContentView.swift; sourceTree = "<group>"; };
+		B30000000000000000000004 /* PhoneGatewayStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneGatewayStore.swift; sourceTree = "<group>"; };
+		B30000000000000000000005 /* PhoneSessionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneSessionController.swift; sourceTree = "<group>"; };
+		B30000000000000000000006 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		B30000000000000000000007 /* WatchConnectivityRelayClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchConnectivityRelayClient.swift; sourceTree = "<group>"; };
+		B30000000000000000000008 /* WatchConnectivityRelayProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchConnectivityRelayProtocol.swift; sourceTree = "<group>"; };
+		B30000000000000000000009 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B3000000000000000000000A /* PhoneLocalBrowserProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneLocalBrowserProtocol.swift; sourceTree = "<group>"; };
+		B3000000000000000000000B /* PhoneLocalBrowserService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneLocalBrowserService.swift; sourceTree = "<group>"; };
+		B3000000000000000000000C /* PhoneBrowserHostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneBrowserHostView.swift; sourceTree = "<group>"; };
+		B3000000000000000000000D /* PhoneBrowserAcceptanceProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneBrowserAcceptanceProbe.swift; sourceTree = "<group>"; };
+		6DD13685F76B2649DF34194A /* CancellationAwareSerialGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "CancellationAwareSerialGate.swift"; path = "../LexiWatch/DictionaryCore/CancellationAwareSerialGate.swift"; sourceTree = SOURCE_ROOT; };
+		79539E2415CEAF120E3898DC /* DeterministicNumberTranslation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "DeterministicNumberTranslation.swift"; path = "../LexiWatch/DictionaryCore/DeterministicNumberTranslation.swift"; sourceTree = SOURCE_ROOT; };
+		8FE5DA25A6C1B52044C4A18A /* DictionaryEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "DictionaryEntry.swift"; path = "../LexiWatch/DictionaryCore/DictionaryEntry.swift"; sourceTree = SOURCE_ROOT; };
+		1A8D6C2A3CB1B35B7AD3DBE9 /* DictionarySearchEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "DictionarySearchEngine.swift"; path = "../LexiWatch/DictionaryCore/DictionarySearchEngine.swift"; sourceTree = SOURCE_ROOT; };
+		BC056A54585276FE2282AD11 /* ExtendedDictionaryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "ExtendedDictionaryStore.swift"; path = "../LexiWatch/DictionaryCore/ExtendedDictionaryStore.swift"; sourceTree = SOURCE_ROOT; };
+		9DB4FEEE71BE30A70372D972 /* FeaturedExpressionPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "FeaturedExpressionPolicy.swift"; path = "../LexiWatch/DictionaryCore/FeaturedExpressionPolicy.swift"; sourceTree = SOURCE_ROOT; };
+		4022875CA0B99AB5F7B8EF8E /* LookupRequestGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "LookupRequestGate.swift"; path = "../LexiWatch/DictionaryCore/LookupRequestGate.swift"; sourceTree = SOURCE_ROOT; };
+		C294492FF728A8D69B490AE3 /* SearchHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "SearchHistory.swift"; path = "../LexiWatch/DictionaryCore/SearchHistory.swift"; sourceTree = SOURCE_ROOT; };
+		58C2F59B0017D73F436B1D12 /* SentencePieceTokenizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "SentencePieceTokenizer.swift"; path = "../LexiWatch/DictionaryCore/SentencePieceTokenizer.swift"; sourceTree = SOURCE_ROOT; };
+		EA206CEE84F28B4E70CBA219 /* LexiWatchLookupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "LexiWatchLookupView.swift"; path = "../LexiWatch/LexiWatchWatchApp/LexiWatchLookupView.swift"; sourceTree = SOURCE_ROOT; };
+		34128AD1FD079FEC34E221C6 /* LookupViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "LookupViewModel.swift"; path = "../LexiWatch/LexiWatchWatchApp/LookupViewModel.swift"; sourceTree = SOURCE_ROOT; };
+		E43DA6C4E317201DDADC27EA /* DictionaryRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "DictionaryRepository.swift"; path = "../LexiWatch/LexiWatchWatchApp/DictionaryRepository.swift"; sourceTree = SOURCE_ROOT; };
+		F743D3F4EA10CBD16B9040D2 /* LocalTranslationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "LocalTranslationService.swift"; path = "../LexiWatch/LexiWatchWatchApp/LocalTranslationService.swift"; sourceTree = SOURCE_ROOT; };
+		9B9D540008B7430D8E2EA4CE /* LocalEnZhDecoder.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; name = "LocalEnZhDecoder.mlpackage"; path = "../LexiWatch/LexiWatchWatchApp/Models/LocalEnZhDecoder.mlpackage"; sourceTree = SOURCE_ROOT; };
+		6715FC59068E1F1905BE7D7D /* LocalEnZhEncoder.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; name = "LocalEnZhEncoder.mlpackage"; path = "../LexiWatch/LexiWatchWatchApp/Models/LocalEnZhEncoder.mlpackage"; sourceTree = SOURCE_ROOT; };
+		720DDADEA81C4940C1B63B36 /* LocalZhEnDecoder.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; name = "LocalZhEnDecoder.mlpackage"; path = "../LexiWatch/LexiWatchWatchApp/Models/LocalZhEnDecoder.mlpackage"; sourceTree = SOURCE_ROOT; };
+		C2CB77E1A8EECC8E9E6A74B7 /* LocalZhEnEncoder.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; name = "LocalZhEnEncoder.mlpackage"; path = "../LexiWatch/LexiWatchWatchApp/Models/LocalZhEnEncoder.mlpackage"; sourceTree = SOURCE_ROOT; };
+		BE81B2A5E57A7E5693240E32 /* offline_dictionary.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; name = "offline_dictionary.json"; path = "../LexiWatch/LexiWatchWatchApp/Resources/offline_dictionary.json"; sourceTree = SOURCE_ROOT; };
+		97632FDD523A960EACA183AC /* offline_dictionary_extended.sqlite */ = {isa = PBXFileReference; lastKnownFileType = file; name = "offline_dictionary_extended.sqlite"; path = "../LexiWatch/LexiWatchWatchApp/Resources/offline_dictionary_extended.sqlite"; sourceTree = SOURCE_ROOT; };
+		E0E2F46A612BA07162EA2FDC /* ZhEnTokenizer.spmlex */ = {isa = PBXFileReference; lastKnownFileType = file; name = "ZhEnTokenizer.spmlex"; path = "../LexiWatch/LexiWatchWatchApp/Resources/Translation/ZhEnTokenizer.spmlex"; sourceTree = SOURCE_ROOT; };
+		A77259DE2E49EB17DFDD0567 /* EnZhTokenizer.spmlex */ = {isa = PBXFileReference; lastKnownFileType = file; name = "EnZhTokenizer.spmlex"; path = "../LexiWatch/LexiWatchWatchApp/Resources/Translation/EnZhTokenizer.spmlex"; sourceTree = SOURCE_ROOT; };
+		97B20FBF0FBA59F9278667FF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = "Assets.xcassets"; path = "../LexiWatch/LexiWatchWatchApp/Assets.xcassets"; sourceTree = SOURCE_ROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		C10000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C30000000000000000000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		D10000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				D10000000000000000000002 /* WatchBrowserWatchApp */,
+				D10000000000000000000003 /* BrowserCore */,
+				D50000000000000000000001 /* SharedLexiWatch */,
+				D30000000000000000000001 /* WatchBrowserPhone */,
+				B10000000000000000000008 /* README.md */,
+				D10000000000000000000004 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		D10000000000000000000002 /* WatchBrowserWatchApp */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000001 /* WatchBrowserApp.swift */,
+				B10000000000000000000002 /* ContentView.swift */,
+				B1000000000000000000000A /* WatchRemoteBrowser.swift */,
+				B1000000000000000000000C /* DeepSeekKeyStore.swift */,
+				B1000000000000000000000D /* AIChatView.swift */,
+				B10000000000000000000015 /* AIChatModel.swift */,
+				B10000000000000000000016 /* AIConversationStore.swift */,
+				B10000000000000000000017 /* DeepSeekService.swift */,
+				B1000000000000000000000E /* DirectWebReader.swift */,
+				B10000000000000000000011 /* GatewayClient.swift */,
+				B10000000000000000000012 /* GatewayTokenStore.swift */,
+				B30000000000000000000007 /* WatchConnectivityRelayClient.swift */,
+				B10000000000000000000013 /* PrivacyInfo.xcprivacy */,
+			);
+			path = WatchBrowserWatchApp;
+			sourceTree = "<group>";
+		};
+		D10000000000000000000003 /* BrowserCore */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000006 /* WebAddress.swift */,
+				B1000000000000000000000B /* DeepSeekProtocol.swift */,
+				B1000000000000000000000F /* DirectWebDocument.swift */,
+				B10000000000000000000010 /* GatewayProtocol.swift */,
+				B10000000000000000000014 /* AIConversation.swift */,
+				B30000000000000000000008 /* WatchConnectivityRelayProtocol.swift */,
+				B3000000000000000000000A /* PhoneLocalBrowserProtocol.swift */,
+			);
+			path = BrowserCore;
+			sourceTree = "<group>";
+		};
+		D10000000000000000000004 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000007 /* WatchBrowser.app */,
+				B30000000000000000000001 /* WatchBrowserPhone.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		D30000000000000000000001 /* WatchBrowserPhone */ = {
+			isa = PBXGroup;
+			children = (
+				B30000000000000000000002 /* WatchBrowserPhoneApp.swift */,
+				B30000000000000000000003 /* PhoneContentView.swift */,
+				B3000000000000000000000C /* PhoneBrowserHostView.swift */,
+				B30000000000000000000004 /* PhoneGatewayStore.swift */,
+				B30000000000000000000005 /* PhoneSessionController.swift */,
+				B3000000000000000000000B /* PhoneLocalBrowserService.swift */,
+				B3000000000000000000000D /* PhoneBrowserAcceptanceProbe.swift */,
+				B30000000000000000000009 /* Info.plist */,
+				B30000000000000000000006 /* PrivacyInfo.xcprivacy */,
+			);
+			path = WatchBrowserPhone;
+			sourceTree = "<group>";
+		};
+		D50000000000000000000001 /* SharedLexiWatch */ = {
+			isa = PBXGroup;
+			children = (
+				6DD13685F76B2649DF34194A /* CancellationAwareSerialGate.swift */,
+				79539E2415CEAF120E3898DC /* DeterministicNumberTranslation.swift */,
+				8FE5DA25A6C1B52044C4A18A /* DictionaryEntry.swift */,
+				1A8D6C2A3CB1B35B7AD3DBE9 /* DictionarySearchEngine.swift */,
+				BC056A54585276FE2282AD11 /* ExtendedDictionaryStore.swift */,
+				9DB4FEEE71BE30A70372D972 /* FeaturedExpressionPolicy.swift */,
+				4022875CA0B99AB5F7B8EF8E /* LookupRequestGate.swift */,
+				C294492FF728A8D69B490AE3 /* SearchHistory.swift */,
+				58C2F59B0017D73F436B1D12 /* SentencePieceTokenizer.swift */,
+				EA206CEE84F28B4E70CBA219 /* LexiWatchLookupView.swift */,
+				34128AD1FD079FEC34E221C6 /* LookupViewModel.swift */,
+				E43DA6C4E317201DDADC27EA /* DictionaryRepository.swift */,
+				F743D3F4EA10CBD16B9040D2 /* LocalTranslationService.swift */,
+				9B9D540008B7430D8E2EA4CE /* LocalEnZhDecoder.mlpackage */,
+				6715FC59068E1F1905BE7D7D /* LocalEnZhEncoder.mlpackage */,
+				720DDADEA81C4940C1B63B36 /* LocalZhEnDecoder.mlpackage */,
+				C2CB77E1A8EECC8E9E6A74B7 /* LocalZhEnEncoder.mlpackage */,
+				BE81B2A5E57A7E5693240E32 /* offline_dictionary.json */,
+				97632FDD523A960EACA183AC /* offline_dictionary_extended.sqlite */,
+				E0E2F46A612BA07162EA2FDC /* ZhEnTokenizer.spmlex */,
+				A77259DE2E49EB17DFDD0567 /* EnZhTokenizer.spmlex */,
+				97B20FBF0FBA59F9278667FF /* Assets.xcassets */,
+			);
+			name = "LexiWatch (shared sources)";
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		E10000000000000000000001 /* WatchBrowser */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F10000000000000000000001 /* Build configuration list for PBXNativeTarget "WatchBrowser" */;
+			buildPhases = (
+				C10000000000000000000002 /* Sources */,
+				C10000000000000000000001 /* Frameworks */,
+				C10000000000000000000003 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = WatchBrowser;
+			packageProductDependencies = (
+			);
+			productName = WatchBrowser;
+			productReference = B10000000000000000000007 /* WatchBrowser.app */;
+			productType = "com.apple.product-type.application";
+		};
+		E30000000000000000000001 /* WatchBrowserPhone */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F30000000000000000000001 /* Build configuration list for PBXNativeTarget "WatchBrowserPhone" */;
+			buildPhases = (
+				C30000000000000000000001 /* Sources */,
+				C30000000000000000000002 /* Frameworks */,
+				C30000000000000000000003 /* Resources */,
+				C30000000000000000000004 /* Embed Watch Content */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				H30000000000000000000001 /* PBXTargetDependency */,
+			);
+			name = WatchBrowserPhone;
+			packageProductDependencies = (
+			);
+			productName = WatchBrowserPhone;
+			productReference = B30000000000000000000001 /* WatchBrowserPhone.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		E10000000000000000000002 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2660;
+				LastUpgradeCheck = 2660;
+				TargetAttributes = {
+					E10000000000000000000001 = {
+						CreatedOnToolsVersion = 26.6;
+					};
+					E30000000000000000000001 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+				};
+			};
+			buildConfigurationList = F10000000000000000000002 /* Build configuration list for PBXProject "WatchBrowser" */;
+			developmentRegion = "zh-Hans";
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+				"zh-Hans",
+			);
+			mainGroup = D10000000000000000000001;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = D10000000000000000000004 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				E10000000000000000000001 /* WatchBrowser */,
+				E30000000000000000000001 /* WatchBrowserPhone */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		C10000000000000000000003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				36011198A519CC951C0BBF1B /* offline_dictionary.json in Resources */,
+				E88DA63323CA6452D284BCF1 /* offline_dictionary_extended.sqlite in Resources */,
+				C52CEC3BED14839165A4E7D9 /* ZhEnTokenizer.spmlex in Resources */,
+				1356077543796BABBB68DCA6 /* EnZhTokenizer.spmlex in Resources */,
+				D67FBDA960EB88E65C15ADBA /* Assets.xcassets in Resources */,
+				A10000000000000000000011 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C30000000000000000000003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A30000000000000000000006 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		C10000000000000000000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				444B20171A8682082A2AB9F2 /* CancellationAwareSerialGate.swift in Sources */,
+				0B7203F13BD9C8872A90EB2A /* DeterministicNumberTranslation.swift in Sources */,
+				8593448F5BD04CD94C7ED72E /* DictionaryEntry.swift in Sources */,
+				D4D9D63D03234554F8311B49 /* DictionarySearchEngine.swift in Sources */,
+				E7D3CB7FC2957B8FE5F141B1 /* ExtendedDictionaryStore.swift in Sources */,
+				EB5316D5747B7BCCA00DE5C5 /* FeaturedExpressionPolicy.swift in Sources */,
+				DEFBD037941F2DB1ED861991 /* LookupRequestGate.swift in Sources */,
+				7078F8D18D7437CE380D50B8 /* SearchHistory.swift in Sources */,
+				392549D9EB711B94A16B38F4 /* SentencePieceTokenizer.swift in Sources */,
+				1A3354E833238E5C43384648 /* LexiWatchLookupView.swift in Sources */,
+				D65B77AC2BE4EB22F368CADB /* LookupViewModel.swift in Sources */,
+				4D68F284B6BCD1B10DEBA37A /* DictionaryRepository.swift in Sources */,
+				63E64077CB791B4AFD25623F /* LocalTranslationService.swift in Sources */,
+				9E887572C200F45665000836 /* LocalEnZhDecoder.mlpackage in Sources */,
+				A720912797AAF01EE169020E /* LocalEnZhEncoder.mlpackage in Sources */,
+				29E8672F1509FAE337AACE32 /* LocalZhEnDecoder.mlpackage in Sources */,
+				CA5F2B16DE4259BF7A572CA6 /* LocalZhEnEncoder.mlpackage in Sources */,
+				A10000000000000000000001 /* WatchBrowserApp.swift in Sources */,
+				A10000000000000000000002 /* ContentView.swift in Sources */,
+				A10000000000000000000006 /* WebAddress.swift in Sources */,
+				A10000000000000000000015 /* DeepSeekProtocol.swift in Sources */,
+				A10000000000000000000016 /* DeepSeekKeyStore.swift in Sources */,
+				A10000000000000000000017 /* DeepSeekService.swift in Sources */,
+				A10000000000000000000008 /* WatchRemoteBrowser.swift in Sources */,
+				A1000000000000000000000B /* AIChatView.swift in Sources */,
+				A10000000000000000000013 /* AIChatModel.swift in Sources */,
+				A10000000000000000000014 /* AIConversationStore.swift in Sources */,
+				A1000000000000000000000C /* DirectWebReader.swift in Sources */,
+				A1000000000000000000000D /* DirectWebDocument.swift in Sources */,
+				A1000000000000000000000E /* GatewayProtocol.swift in Sources */,
+				A10000000000000000000012 /* AIConversation.swift in Sources */,
+				A1000000000000000000000F /* GatewayClient.swift in Sources */,
+				A10000000000000000000010 /* GatewayTokenStore.swift in Sources */,
+				A30000000000000000000008 /* WatchConnectivityRelayClient.swift in Sources */,
+				A30000000000000000000009 /* WatchConnectivityRelayProtocol.swift in Sources */,
+				A3000000000000000000000A /* PhoneLocalBrowserProtocol.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C30000000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A30000000000000000000001 /* WatchBrowserPhoneApp.swift in Sources */,
+				A30000000000000000000002 /* PhoneContentView.swift in Sources */,
+				A30000000000000000000003 /* PhoneGatewayStore.swift in Sources */,
+				A30000000000000000000004 /* PhoneSessionController.swift in Sources */,
+				A30000000000000000000005 /* WatchConnectivityRelayProtocol.swift in Sources */,
+				A3000000000000000000000B /* PhoneLocalBrowserProtocol.swift in Sources */,
+				A3000000000000000000000C /* PhoneLocalBrowserService.swift in Sources */,
+				A3000000000000000000000D /* PhoneBrowserHostView.swift in Sources */,
+				A3000000000000000000000E /* PhoneBrowserAcceptanceProbe.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		H30000000000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E10000000000000000000001 /* WatchBrowser */;
+			targetProxy = G30000000000000000000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		F20000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 48;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = WatchBrowserWatchApp/Info.plist;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COREML_CODEGEN_LANGUAGE = None;
+				OTHER_LDFLAGS = "$(inherited) -lsqlite3";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				MARKETING_VERSION = 0.9.9;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.wristassistant.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 11.0;
+			};
+			name = Debug;
+		};
+		F20000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 48;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = WatchBrowserWatchApp/Info.plist;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COREML_CODEGEN_LANGUAGE = None;
+				OTHER_LDFLAGS = "$(inherited) -lsqlite3";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				MARKETING_VERSION = 0.9.9;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.wristassistant.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 11.0;
+			};
+			name = Release;
+		};
+		F40000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 48;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = WatchBrowserPhone/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				MARKETING_VERSION = 0.9.9;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(IOS_COMPANION_BUNDLE_ID)";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		F40000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 48;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = WatchBrowserPhone/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				MARKETING_VERSION = 0.9.9;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(IOS_COMPANION_BUNDLE_ID)";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		F20000000000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				IOS_COMPANION_BUNDLE_ID = com.example.wristassistant;
+				ONLY_ACTIVE_ARCH = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		F20000000000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				IOS_COMPANION_BUNDLE_ID = com.example.wristassistant;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		F10000000000000000000001 /* Build configuration list for PBXNativeTarget "WatchBrowser" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F20000000000000000000001 /* Debug */,
+				F20000000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F10000000000000000000002 /* Build configuration list for PBXProject "WatchBrowser" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F20000000000000000000003 /* Debug */,
+				F20000000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F30000000000000000000001 /* Build configuration list for PBXNativeTarget "WatchBrowserPhone" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F40000000000000000000001 /* Debug */,
+				F40000000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = E10000000000000000000002 /* Project object */;
+}
