@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AE6100000000000000000011 /* AssistantActivitySnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE6100000000000000000010; };
+		AE6100000000000000000012 /* AssistantActivitySnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE6100000000000000000010; };
+		A90000000000000000000001 /* AIAnswerDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90000000000000000000001 /* AIAnswerDocument.swift */; };
 		A10000000000000000000001 /* WatchBrowserApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000001 /* WatchBrowserApp.swift */; };
 		A10000000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000002 /* ContentView.swift */; };
 		A10000000000000000000006 /* WebAddress.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000006 /* WebAddress.swift */; };
@@ -60,6 +63,8 @@
 		C52CEC3BED14839165A4E7D9 /* ZhEnTokenizer.spmlex in Resources */ = {isa = PBXBuildFile; fileRef = E0E2F46A612BA07162EA2FDC /* ZhEnTokenizer.spmlex */; };
 		1356077543796BABBB68DCA6 /* EnZhTokenizer.spmlex in Resources */ = {isa = PBXBuildFile; fileRef = A77259DE2E49EB17DFDD0567 /* EnZhTokenizer.spmlex */; };
 		D67FBDA960EB88E65C15ADBA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97B20FBF0FBA59F9278667FF /* Assets.xcassets */; };
+		AE6100000000000000000006 /* WatchAssistantWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE6100000000000000000002; };
+		AE6100000000000000000007 /* WatchAssistantWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = AE6100000000000000000004; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -69,6 +74,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = E10000000000000000000001;
 			remoteInfo = WatchBrowser;
+		};
+		AE610000000000000000000A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E10000000000000000000002;
+			proxyType = 1;
+			remoteGlobalIDString = AE6100000000000000000001;
+			remoteInfo = WatchAssistantWidget;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -84,9 +96,20 @@
 			name = "Embed Watch Content";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AE6100000000000000000009 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (AE6100000000000000000007, );
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		AE6100000000000000000010 /* AssistantActivitySnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantActivitySnapshot.swift; sourceTree = "<group>"; };
+		B90000000000000000000001 /* AIAnswerDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIAnswerDocument.swift; sourceTree = "<group>"; };
 		B10000000000000000000001 /* WatchBrowserApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchBrowserApp.swift; sourceTree = "<group>"; };
 		B10000000000000000000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		B10000000000000000000006 /* WebAddress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebAddress.swift; sourceTree = "<group>"; };
@@ -141,6 +164,9 @@
 		E0E2F46A612BA07162EA2FDC /* ZhEnTokenizer.spmlex */ = {isa = PBXFileReference; lastKnownFileType = file; name = "ZhEnTokenizer.spmlex"; path = "../LexiWatch/LexiWatchWatchApp/Resources/Translation/ZhEnTokenizer.spmlex"; sourceTree = SOURCE_ROOT; };
 		A77259DE2E49EB17DFDD0567 /* EnZhTokenizer.spmlex */ = {isa = PBXFileReference; lastKnownFileType = file; name = "EnZhTokenizer.spmlex"; path = "../LexiWatch/LexiWatchWatchApp/Resources/Translation/EnZhTokenizer.spmlex"; sourceTree = SOURCE_ROOT; };
 		97B20FBF0FBA59F9278667FF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = "Assets.xcassets"; path = "../LexiWatch/LexiWatchWatchApp/Assets.xcassets"; sourceTree = SOURCE_ROOT; };
+		AE6100000000000000000002 /* WatchAssistantWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchAssistantWidget.swift; sourceTree = "<group>"; };
+		AE6100000000000000000003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		AE6100000000000000000004 /* WatchAssistantWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = WatchAssistantWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -164,6 +190,7 @@
 		D10000000000000000000001 = {
 			isa = PBXGroup;
 			children = (
+				AE6100000000000000000005 /* WatchAssistantWidget */,
 				D10000000000000000000002 /* WatchBrowserWatchApp */,
 				D10000000000000000000003 /* BrowserCore */,
 				D50000000000000000000001 /* SharedLexiWatch */,
@@ -201,6 +228,7 @@
 				B1000000000000000000000F /* DirectWebDocument.swift */,
 				B10000000000000000000010 /* GatewayProtocol.swift */,
 				B10000000000000000000014 /* AIConversation.swift */,
+				B90000000000000000000001 /* AIAnswerDocument.swift */,
 				B30000000000000000000008 /* WatchConnectivityRelayProtocol.swift */,
 				B3000000000000000000000A /* PhoneLocalBrowserProtocol.swift */,
 			);
@@ -210,6 +238,7 @@
 		D10000000000000000000004 /* Products */ = {
 			isa = PBXGroup;
 			children = (
+				AE6100000000000000000004 /* WatchAssistantWidget.appex */,
 				B10000000000000000000007 /* WatchBrowser.app */,
 				B30000000000000000000001 /* WatchBrowserPhone.app */,
 			);
@@ -261,6 +290,12 @@
 			name = "LexiWatch (shared sources)";
 			sourceTree = "<group>";
 		};
+		AE6100000000000000000005 /* WatchAssistantWidget */ = {
+			isa = PBXGroup;
+			children = (AE6100000000000000000002, AE6100000000000000000003, AE6100000000000000000010, );
+			path = WatchAssistantWidget;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -268,6 +303,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = F10000000000000000000001 /* Build configuration list for PBXNativeTarget "WatchBrowser" */;
 			buildPhases = (
+				AE6100000000000000000009 /* Embed App Extensions */,
 				C10000000000000000000002 /* Sources */,
 				C10000000000000000000001 /* Frameworks */,
 				C10000000000000000000003 /* Resources */,
@@ -275,6 +311,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				AE610000000000000000000B /* PBXTargetDependency */,
 			);
 			name = WatchBrowser;
 			packageProductDependencies = (
@@ -303,6 +340,17 @@
 			productName = WatchBrowserPhone;
 			productReference = B30000000000000000000001 /* WatchBrowserPhone.app */;
 			productType = "com.apple.product-type.application";
+		};
+		AE6100000000000000000001 /* WatchAssistantWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AE610000000000000000000E;
+			buildPhases = (AE6100000000000000000008, );
+			buildRules = ();
+			dependencies = ();
+			name = WatchAssistantWidget;
+			productName = WatchAssistantWidget;
+			productReference = AE6100000000000000000004;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -337,6 +385,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
+				AE6100000000000000000001 /* WatchAssistantWidget */,
 				E10000000000000000000001 /* WatchBrowser */,
 				E30000000000000000000001 /* WatchBrowserPhone */,
 			);
@@ -403,6 +452,8 @@
 				A1000000000000000000000D /* DirectWebDocument.swift in Sources */,
 				A1000000000000000000000E /* GatewayProtocol.swift in Sources */,
 				A10000000000000000000012 /* AIConversation.swift in Sources */,
+				AE6100000000000000000011 /* AssistantActivitySnapshot.swift in Sources */,
+				A90000000000000000000001 /* AIAnswerDocument.swift in Sources */,
 				A1000000000000000000000F /* GatewayClient.swift in Sources */,
 				A10000000000000000000010 /* GatewayTokenStore.swift in Sources */,
 				A30000000000000000000008 /* WatchConnectivityRelayClient.swift in Sources */,
@@ -427,6 +478,12 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AE6100000000000000000008 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (AE6100000000000000000006, AE6100000000000000000012, );
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -435,6 +492,11 @@
 			target = E10000000000000000000001 /* WatchBrowser */;
 			targetProxy = G30000000000000000000001 /* PBXContainerItemProxy */;
 		};
+		AE610000000000000000000B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AE6100000000000000000001;
+			targetProxy = AE610000000000000000000A;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
@@ -442,17 +504,18 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 48;
+				CURRENT_PROJECT_VERSION = 66;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = WatchBrowserWatchApp/Info.plist;
+				CODE_SIGN_ENTITLEMENTS = WatchAssistantWidget/AssistantActivity.entitlements;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				COREML_CODEGEN_LANGUAGE = None;
 				OTHER_LDFLAGS = "$(inherited) -lsqlite3";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				MARKETING_VERSION = 0.9.9;
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.wristassistant.watchkitapp;
+				MARKETING_VERSION = 0.9.27;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(IOS_COMPANION_BUNDLE_ID).watchkitapp";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
@@ -469,17 +532,18 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 48;
+				CURRENT_PROJECT_VERSION = 66;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = WatchBrowserWatchApp/Info.plist;
+				CODE_SIGN_ENTITLEMENTS = WatchAssistantWidget/AssistantActivity.entitlements;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				COREML_CODEGEN_LANGUAGE = None;
 				OTHER_LDFLAGS = "$(inherited) -lsqlite3";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				MARKETING_VERSION = 0.9.9;
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.wristassistant.watchkitapp;
+				MARKETING_VERSION = 0.9.27;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(IOS_COMPANION_BUNDLE_ID).watchkitapp";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
@@ -497,14 +561,14 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 48;
+				CURRENT_PROJECT_VERSION = 66;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = WatchBrowserPhone/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				MARKETING_VERSION = 0.9.9;
+				MARKETING_VERSION = 0.9.27;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(IOS_COMPANION_BUNDLE_ID)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -523,14 +587,14 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 48;
+				CURRENT_PROJECT_VERSION = 66;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = WatchBrowserPhone/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				MARKETING_VERSION = 0.9.9;
+				MARKETING_VERSION = 0.9.27;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(IOS_COMPANION_BUNDLE_ID)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -577,6 +641,48 @@
 			};
 			name = Release;
 		};
+		AE610000000000000000000C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 66;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = WatchAssistantWidget/Info.plist;
+				CODE_SIGN_ENTITLEMENTS = WatchAssistantWidget/AssistantActivity.entitlements;
+				MARKETING_VERSION = 0.9.27;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(IOS_COMPANION_BUNDLE_ID).watchkitapp.assistantwidget";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 11.0;
+			};
+			name = Debug;
+		};
+		AE610000000000000000000D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 66;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = WatchAssistantWidget/Info.plist;
+				CODE_SIGN_ENTITLEMENTS = WatchAssistantWidget/AssistantActivity.entitlements;
+				MARKETING_VERSION = 0.9.27;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(IOS_COMPANION_BUNDLE_ID).watchkitapp.assistantwidget";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 11.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -604,6 +710,12 @@
 				F40000000000000000000001 /* Debug */,
 				F40000000000000000000002 /* Release */,
 			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AE610000000000000000000E /* Build configuration list for WatchAssistantWidget */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (AE610000000000000000000C, AE610000000000000000000D, );
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};

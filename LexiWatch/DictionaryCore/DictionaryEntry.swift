@@ -200,6 +200,17 @@ public enum DictionaryTextSanitizer {
 }
 
 public struct DictionaryEntry: Codable, Hashable, Identifiable, Sendable {
+    public struct RegionalPronunciation: Codable, Hashable, Sendable {
+        public enum Region: String, Codable, Hashable, Sendable {
+            case uk
+            case us
+        }
+
+        public let ipa: String
+        public let region: Region?
+        public let partOfSpeech: String
+    }
+
     public struct RelatedExpression: Codable, Hashable, Identifiable, Sendable {
         public enum Kind: String, Codable, Hashable, Sendable {
             case phrasalVerb
@@ -221,6 +232,7 @@ public struct DictionaryEntry: Codable, Hashable, Identifiable, Sendable {
         public let example: String?
         public let exampleChinese: String?
         public let priority: Int
+        public let partOfSpeech: String?
 
         public var id: String { "\(kind.rawValue):\(text)" }
 
@@ -230,7 +242,8 @@ public struct DictionaryEntry: Codable, Hashable, Identifiable, Sendable {
             chinese: String,
             example: String? = nil,
             exampleChinese: String? = nil,
-            priority: Int = 100
+            priority: Int = 100,
+            partOfSpeech: String? = nil
         ) {
             self.text = DictionaryTextSanitizer.sanitize(text)
             self.kind = kind
@@ -238,6 +251,7 @@ public struct DictionaryEntry: Codable, Hashable, Identifiable, Sendable {
             self.example = DictionaryTextSanitizer.sanitize(example)
             self.exampleChinese = DictionaryTextSanitizer.sanitize(exampleChinese)
             self.priority = priority
+            self.partOfSpeech = DictionaryTextSanitizer.sanitize(partOfSpeech)
         }
     }
 
@@ -246,6 +260,7 @@ public struct DictionaryEntry: Codable, Hashable, Identifiable, Sendable {
         public let chinese: String
         public let englishDefinition: String?
         public let collocations: [String]
+        public let collocationDetails: [RelatedExpression]?
         public let example: String?
         public let exampleChinese: String?
 
@@ -255,7 +270,8 @@ public struct DictionaryEntry: Codable, Hashable, Identifiable, Sendable {
             englishDefinition: String? = nil,
             collocations: [String] = [],
             example: String? = nil,
-            exampleChinese: String? = nil
+            exampleChinese: String? = nil,
+            collocationDetails: [RelatedExpression]? = nil
         ) {
             self.partOfSpeech = DictionaryTextSanitizer.sanitize(partOfSpeech)
             self.chinese = DictionaryTextSanitizer.sanitize(chinese)
@@ -263,12 +279,14 @@ public struct DictionaryEntry: Codable, Hashable, Identifiable, Sendable {
             self.collocations = collocations.map(DictionaryTextSanitizer.sanitize)
             self.example = DictionaryTextSanitizer.sanitize(example)
             self.exampleChinese = DictionaryTextSanitizer.sanitize(exampleChinese)
+            self.collocationDetails = collocationDetails
         }
     }
 
     public let id: String
     public let headword: String
     public let pronunciation: String?
+    public let regionalPronunciations: [RegionalPronunciation]
     public let aliases: [String]
     public let keywords: [String]
     public let meanings: [Meaning]
@@ -287,11 +305,13 @@ public struct DictionaryEntry: Codable, Hashable, Identifiable, Sendable {
         relatedExpressions: [RelatedExpression] = [],
         level: String? = nil,
         source: String? = nil,
-        priority: Int = 30_000
+        priority: Int = 30_000,
+        regionalPronunciations: [RegionalPronunciation] = []
     ) {
         self.id = DictionaryTextSanitizer.sanitize(id)
         self.headword = DictionaryTextSanitizer.sanitize(headword)
         self.pronunciation = DictionaryTextSanitizer.sanitize(pronunciation)
+        self.regionalPronunciations = regionalPronunciations
         self.aliases = aliases.map(DictionaryTextSanitizer.sanitize)
         self.keywords = keywords.map(DictionaryTextSanitizer.sanitize)
         self.meanings = meanings.map {
@@ -301,7 +321,8 @@ public struct DictionaryEntry: Codable, Hashable, Identifiable, Sendable {
                 englishDefinition: $0.englishDefinition,
                 collocations: $0.collocations,
                 example: $0.example,
-                exampleChinese: $0.exampleChinese
+                exampleChinese: $0.exampleChinese,
+                collocationDetails: $0.collocationDetails
             )
         }
         self.relatedExpressions = relatedExpressions.map {
@@ -311,7 +332,8 @@ public struct DictionaryEntry: Codable, Hashable, Identifiable, Sendable {
                 chinese: $0.chinese,
                 example: $0.example,
                 exampleChinese: $0.exampleChinese,
-                priority: $0.priority
+                priority: $0.priority,
+                partOfSpeech: $0.partOfSpeech
             )
         }.sorted {
             if $0.kind != $1.kind {
@@ -329,6 +351,7 @@ public struct DictionaryEntry: Codable, Hashable, Identifiable, Sendable {
         case id
         case headword
         case pronunciation
+        case regionalPronunciations
         case aliases
         case keywords
         case meanings
@@ -353,7 +376,10 @@ public struct DictionaryEntry: Codable, Hashable, Identifiable, Sendable {
             ) ?? [],
             level: try container.decodeIfPresent(String.self, forKey: .level),
             source: try container.decodeIfPresent(String.self, forKey: .source),
-            priority: try container.decodeIfPresent(Int.self, forKey: .priority) ?? 30_000
+            priority: try container.decodeIfPresent(Int.self, forKey: .priority) ?? 30_000,
+            regionalPronunciations: try container.decodeIfPresent(
+                [RegionalPronunciation].self, forKey: .regionalPronunciations
+            ) ?? []
         )
     }
 }
@@ -389,6 +415,13 @@ public struct FavoriteWord: Codable, Hashable, Identifiable, Sendable {
             pronunciation: entry.pronunciation,
             conciseChinese: Self.conciseChinese(for: entry)
         )
+    }
+
+    public func matches(_ entry: DictionaryEntry) -> Bool {
+        if id == entry.id { return true }
+        let oxfordPrefix = "oxford-10:"
+        return id.hasPrefix(oxfordPrefix) && entry.id.hasPrefix(oxfordPrefix) &&
+            entry.aliases.contains { id == oxfordPrefix + $0 }
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -493,6 +526,18 @@ public enum UnifiedLookupRoute: Equatable, Sendable {
 public enum UnifiedLookupPolicy {
     public static func route(for response: SearchResponse) -> UnifiedLookupRoute {
         response.hasExactMatch ? .dictionary : .translation
+    }
+
+    /// Only try this after the original spelling and phrase have been checked.
+    public static func joinedEnglishSpellingCandidate(for rawQuery: String) -> String? {
+        let query = rawQuery.folding(options: .widthInsensitive, locale: nil)
+            .trimmingCharacters(in: CharacterSet.punctuationCharacters.union(.whitespacesAndNewlines))
+        let parts = query.split(whereSeparator: \.isWhitespace)
+        guard parts.count > 1 else { return nil }
+        let spelling = parts.joined().lowercased()
+        guard (2...32).contains(spelling.utf8.count),
+              spelling.utf8.allSatisfy({ (97...122).contains($0) }) else { return nil }
+        return spelling
     }
 
     /// A broad secondary dictionary normally stays closed after a core hit.

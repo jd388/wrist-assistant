@@ -159,7 +159,8 @@ final class GatewayClient: @unchecked Sendable {
                     webSearchProvider: metadata.webSearchProvider,
                     pageContextUsed: metadata.pageContextUsed,
                     truncated: truncated || wasCapped,
-                    responseItems: metadata.responseItems
+                    responseItems: metadata.responseItems,
+                    conversationTitle: metadata.conversationTitle
                 )
                 result = response
                 return [
@@ -256,7 +257,8 @@ final class GatewayClient: @unchecked Sendable {
     func ask(
         _ payload: GatewayAskRequest,
         serverURL: String,
-        token: String
+        token: String,
+        generateTitle: Bool = false
     ) async throws -> GatewayAskResponse {
         let response: GatewayAskResponse = try await post(
             path: ["v1", "ask"],
@@ -265,7 +267,8 @@ final class GatewayClient: @unchecked Sendable {
             token: token,
             maximumBytes: DeepSeekRequestPolicy.maximumResponseBytes,
             directOnly: true,
-            maximumRetries: 0
+            maximumRetries: 0,
+            generateTitle: generateTitle
         )
         _ = try response.validatedAnswer()
         return response
@@ -275,6 +278,7 @@ final class GatewayClient: @unchecked Sendable {
         _ payload: GatewayAskRequest,
         serverURL: String,
         token: String,
+        generateTitle: Bool = false,
         onEvent: @escaping @Sendable (GatewayAskStreamEvent) async -> Void
     ) async throws -> GatewayAskResponse {
         do {
@@ -282,6 +286,7 @@ final class GatewayClient: @unchecked Sendable {
                 payload,
                 serverURL: serverURL,
                 token: token,
+                generateTitle: generateTitle,
                 onEvent: onEvent
             )
         } catch is CancellationError {
@@ -289,7 +294,9 @@ final class GatewayClient: @unchecked Sendable {
         } catch let error as GatewayClientError where error.isStreamingEndpointUnavailable {
             // Older free Worker deployments may only expose the JSON endpoint.
             // Keep the feature usable without replaying any other failure.
-            let response = try await ask(payload, serverURL: serverURL, token: token)
+            let response = try await ask(
+                payload, serverURL: serverURL, token: token, generateTitle: generateTitle
+            )
             await onEvent(
                 .metadata(
                     GatewayAskStreamMetadata(
@@ -298,7 +305,8 @@ final class GatewayClient: @unchecked Sendable {
                         webSearchUsed: response.webSearchUsed,
                         webSearchProvider: response.webSearchProvider,
                         pageContextUsed: response.pageContextUsed,
-                        responseItems: response.responseItems
+                        responseItems: response.responseItems,
+                        conversationTitle: response.conversationTitle
                     )
                 )
             )
@@ -317,6 +325,7 @@ final class GatewayClient: @unchecked Sendable {
         _ payload: GatewayAskRequest,
         serverURL: String,
         token: String,
+        generateTitle: Bool,
         onEvent: @escaping @Sendable (GatewayAskStreamEvent) async -> Void
     ) async throws -> GatewayAskResponse {
         let configuration = try GatewayConfiguration(serverURL: serverURL, token: token)
@@ -330,6 +339,9 @@ final class GatewayClient: @unchecked Sendable {
         request.httpMethod = "POST"
         request.timeoutInterval = 150
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        if generateTitle {
+            request.setValue("true", forHTTPHeaderField: "X-Wrist-Conversation-Title")
+        }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(configuration.token)", forHTTPHeaderField: "Authorization")
         request.setValue("WatchBrowser/1.0 watchOS", forHTTPHeaderField: "User-Agent")
@@ -420,7 +432,8 @@ final class GatewayClient: @unchecked Sendable {
         token: String,
         maximumBytes: Int,
         directOnly: Bool = false,
-        maximumRetries: Int = 1
+        maximumRetries: Int = 1,
+        generateTitle: Bool = false
     ) async throws -> Response {
         let configuration = try GatewayConfiguration(serverURL: serverURL, token: token)
         let endpoint = path.reduce(configuration.baseURL) { partial, component in
@@ -434,6 +447,9 @@ final class GatewayClient: @unchecked Sendable {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.timeoutInterval = 75
+        if generateTitle {
+            request.setValue("true", forHTTPHeaderField: "X-Wrist-Conversation-Title")
+        }
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(configuration.token)", forHTTPHeaderField: "Authorization")

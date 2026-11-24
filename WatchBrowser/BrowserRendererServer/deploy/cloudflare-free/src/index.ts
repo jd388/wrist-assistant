@@ -161,21 +161,17 @@ async function route(request: Request, env: Environment): Promise<Response> {
     if (request.method !== "POST") return methodNotAllowed("POST");
     return read(parseRead(await readJSON(request)), env);
   }
-  if (path === "/v1/ask") {
+  if (path === "/v1/ask" || path === "/v1/ask/stream") {
     if (request.method !== "POST") return methodNotAllowed("POST");
-    return jsonResponse(await askAI(
-      parseAsk(await readJSON(request, MAX_ASK_REQUEST_BYTES)),
-      env,
-      request.signal
-    ));
-  }
-  if (path === "/v1/ask/stream") {
-    if (request.method !== "POST") return methodNotAllowed("POST");
-    return streamAI(
-      parseAsk(await readJSON(request, MAX_ASK_REQUEST_BYTES)),
-      env,
-      request.signal
-    );
+    const payload = parseAsk(await readJSON(request, MAX_ASK_REQUEST_BYTES));
+    // Older Workers ignore this header and still accept the same JSON body.
+    if (payload.mode === "answer" && payload.page === null
+        && request.headers.get("X-Wrist-Conversation-Title") === "true") {
+      payload.generate_title = true;
+    }
+    return path === "/v1/ask/stream"
+      ? streamAI(payload, env, request.signal)
+      : jsonResponse(await askAI(payload, env, request.signal));
   }
   if (path === "/v1/sessions/open") {
     if (request.method !== "POST") return methodNotAllowed("POST");

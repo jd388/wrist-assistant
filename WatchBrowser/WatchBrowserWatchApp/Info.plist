@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>AssistantActivityAccessGroup</key>
+    <string>$(DEVELOPMENT_TEAM).$(IOS_COMPANION_BUNDLE_ID).widget-activity</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
@@ -22,6 +24,17 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>BrowserRendererBaseURL</key>
 	<string>$(BROWSER_RENDERER_BASE_URL)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>wristassistant</string>
+			</array>
+		</dict>
+	</array>
 	<key>WKPrefersNetworkUponForeground</key>
 	<true/>
 	<key>WKApplication</key>

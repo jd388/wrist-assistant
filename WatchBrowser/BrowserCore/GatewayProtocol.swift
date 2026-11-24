@@ -765,6 +765,7 @@ public struct GatewayAskResponse: Codable, Equatable, Sendable {
     public let pageContextUsed: Bool
     public let truncated: Bool?
     public let responseItems: [GatewayResponseItem]?
+    public let conversationTitle: String?
 
     enum CodingKeys: String, CodingKey {
         case answer
@@ -776,6 +777,7 @@ public struct GatewayAskResponse: Codable, Equatable, Sendable {
         case pageContextUsed = "page_context_used"
         case truncated
         case responseItems = "response_items"
+        case conversationTitle = "conversation_title"
     }
 
     public init(
@@ -787,7 +789,8 @@ public struct GatewayAskResponse: Codable, Equatable, Sendable {
         webSearchProvider: GatewayWebSearchProvider?,
         pageContextUsed: Bool,
         truncated: Bool?,
-        responseItems: [GatewayResponseItem]? = nil
+        responseItems: [GatewayResponseItem]? = nil,
+        conversationTitle: String? = nil
     ) {
         self.answer = answer
         self.reasoning = reasoning
@@ -797,6 +800,7 @@ public struct GatewayAskResponse: Codable, Equatable, Sendable {
         self.webSearchProvider = webSearchProvider
         self.pageContextUsed = pageContextUsed
         self.truncated = truncated
+        self.conversationTitle = conversationTitle
         self.responseItems = responseItems.flatMap {
             try? GatewayResponseItemsPolicy.validated($0)
         }
@@ -819,7 +823,8 @@ public struct GatewayAskResponse: Codable, Equatable, Sendable {
             responseItems: try values.decodeIfPresent(
                 [GatewayResponseItem].self,
                 forKey: .responseItems
-            )
+            ),
+            conversationTitle: try? values.decodeIfPresent(String.self, forKey: .conversationTitle)
         )
     }
 
@@ -837,6 +842,7 @@ public struct GatewayAskStreamMetadata: Codable, Equatable, Sendable {
     public let webSearchProvider: GatewayWebSearchProvider?
     public let pageContextUsed: Bool
     public let responseItems: [GatewayResponseItem]?
+    public let conversationTitle: String?
 
     enum CodingKeys: String, CodingKey {
         case citations
@@ -845,6 +851,7 @@ public struct GatewayAskStreamMetadata: Codable, Equatable, Sendable {
         case webSearchProvider = "web_search_provider"
         case pageContextUsed = "page_context_used"
         case responseItems = "response_items"
+        case conversationTitle = "conversation_title"
     }
 
     public init(
@@ -853,13 +860,15 @@ public struct GatewayAskStreamMetadata: Codable, Equatable, Sendable {
         webSearchUsed: Bool,
         webSearchProvider: GatewayWebSearchProvider?,
         pageContextUsed: Bool,
-        responseItems: [GatewayResponseItem]? = nil
+        responseItems: [GatewayResponseItem]? = nil,
+        conversationTitle: String? = nil
     ) {
         self.citations = citations
         self.model = model
         self.webSearchUsed = webSearchUsed
         self.webSearchProvider = webSearchProvider
         self.pageContextUsed = pageContextUsed
+        self.conversationTitle = conversationTitle
         self.responseItems = responseItems.flatMap {
             try? GatewayResponseItemsPolicy.validated($0)
         }
@@ -879,7 +888,8 @@ public struct GatewayAskStreamMetadata: Codable, Equatable, Sendable {
             responseItems: try values.decodeIfPresent(
                 [GatewayResponseItem].self,
                 forKey: .responseItems
-            )
+            ),
+            conversationTitle: try? values.decodeIfPresent(String.self, forKey: .conversationTitle)
         )
     }
 }
@@ -905,6 +915,7 @@ extension GatewayAskStreamEvent: Decodable {
         case webSearchProvider = "web_search_provider"
         case pageContextUsed = "page_context_used"
         case responseItems = "response_items"
+        case conversationTitle = "conversation_title"
         case code
         case message
         case retryable
@@ -927,6 +938,9 @@ extension GatewayAskStreamEvent: Decodable {
                     responseItems: try values.decodeIfPresent(
                         [GatewayResponseItem].self,
                         forKey: .responseItems
+                    ),
+                    conversationTitle: try? values.decodeIfPresent(
+                        String.self, forKey: .conversationTitle
                     )
                 )
             )

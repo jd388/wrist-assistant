@@ -1,6 +1,25 @@
 import Testing
 @testable import DictionaryCore
 
+@Test func usagePatternsHideBareGrammarLabelsAndKeepConcreteConstructions() {
+    for (headword, pattern) in [
+        ("lie", "lie + adv./prep."), ("lie", "+ prep."), ("lie", "lie + adverb or preposition"),
+        ("take", "take sth (+ adv./prep.)"), ("read", "read somebody"),
+        ("take", "take sb / sth"), ("live", "live + adj."), ("take", "be taked + adv."),
+        ("say", "(+ speech)"), ("say", "say sb"), ("turn over", "turn over + adv.")
+    ] {
+        #expect(!FeaturedExpressionPolicy.isUsefulUsagePattern(pattern, headword: headword))
+    }
+    for (headword, pattern) in [
+        ("lie", "lie to sb"), ("lie", "lie about (doing) sth"),
+        ("prevent", "prevent sb/sth from doing sth"), ("give", "give sb sth"),
+        ("regard", "regard sb as + adj."), ("say", "say that…"), ("take", "take effect"),
+        ("stimulate", "stimulate growth 促进增长")
+    ] {
+        #expect(FeaturedExpressionPolicy.isUsefulUsagePattern(pattern, headword: headword))
+    }
+}
+
 @Test func featuredExpressionsBalanceGivePhrasesAndTeachingPatterns() {
     let expressions = [
         expression("give up", kind: .phrasalVerb, priority: 0),

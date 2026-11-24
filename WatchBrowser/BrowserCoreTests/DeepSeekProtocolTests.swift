@@ -70,11 +70,45 @@ final class DeepSeekProtocolTests: XCTestCase {
         XCTAssertEqual(object["model"] as? String, "deepseek-flash")
         XCTAssertEqual(reasoning["effort"], "none")
         XCTAssertEqual(object["stream"] as? Bool, true)
-        XCTAssertEqual(object["max_output_tokens"] as? Int, 2_048)
+        XCTAssertEqual(object["max_output_tokens"] as? Int, 4_096)
         XCTAssertNil(object["tools"])
         XCTAssertNil(object["tool_choice"])
         XCTAssertNil(object["user"])
+        XCTAssertNil(object["title"])
         XCTAssertEqual(input.last?["content"], "为什么天空是蓝色？")
+    }
+
+    func testConversationTitleUsesTheAnswerRequestAndFinalResponse() throws {
+        let payload = try GatewayAskRequest(question: "抛物线有什么性质？", webSearch: false)
+        let request = DeepSeekResponsesRequest(payload: payload, requestedModel: .pro, generateTitle: true)
+        let body = try jsonObject(request)
+        XCTAssertEqual(body["title"] as? [String: Bool], ["enabled": true])
+        XCTAssertEqual(body["model"] as? String, DeepSeekModel.pro.rawValue)
+        XCTAssertEqual(body["max_output_tokens"] as? Int, 4_096)
+
+        let complete = """
+        {"type":"response.completed","response":{"status":"completed","title":"抛物线的性质"}}
+        """
+        let event = try JSONDecoder().decode(
+            DeepSeekResponsesStreamEnvelope.self, from: Data(complete.utf8)
+        ).event()
+        guard case .completed(let response) = event else {
+            return XCTFail("Expected a completed response")
+        }
+        let answer = try response.gatewayResponse(for: payload, accumulatedAnswer: "焦点与准线。")
+        XCTAssertEqual(answer.answer, "焦点与准线。")
+        XCTAssertEqual(answer.conversationTitle, "抛物线的性质")
+    }
+
+    func testMalformedOptionalTitleDoesNotInvalidateTheAnswer() throws {
+        let payload = try GatewayAskRequest(question: "问题", webSearch: false)
+        let response = try JSONDecoder().decode(
+            DeepSeekResponsesResponse.self,
+            from: Data(#"{"status":"completed","title":{"enabled":true}}"#.utf8)
+        )
+        let answer = try response.gatewayResponse(for: payload, accumulatedAnswer: "回答")
+        XCTAssertEqual(answer.answer, "回答")
+        XCTAssertNil(answer.conversationTitle)
     }
 
     func testQuickSearchUsesFlashServerToolWithoutUnsupportedForcedChoice() throws {
@@ -85,6 +119,71 @@ final class DeepSeekProtocolTests: XCTestCase {
         XCTAssertEqual(tools, [["type": "deepseek_web_search"]])
         XCTAssertNil(object["tool_choice"])
         XCTAssertEqual((object["reasoning"] as? [String: String])?["effort"], "none")
+    }
+
+    func testExplicitModelThinkingAndWebSearchAreIndependent() throws {
+        for model in [DeepSeekModel.flash, .pro] {
+            for deepThinking in [false, true] {
+                for webSearch in [false, true] {
+                    let payload = try GatewayAskRequest(
+                        question: "问题",
+                        webSearch: webSearch,
+                        deepThinking: deepThinking
+                    )
+                    let object = try jsonObject(
+                        DeepSeekResponsesRequest(payload: payload, requestedModel: model)
+                    )
+                    XCTAssertEqual(object["model"] as? String, model.rawValue)
+                    XCTAssertEqual((object["reasoning"] as? [String: String])?["effort"], deepThinking ? "high" : "none")
+                    let expectedTool = model == .pro ? "web_search" : "deepseek_web_search"
+                    XCTAssertEqual(object["tools"] as? [[String: String]], webSearch ? [["type": expectedTool]] : nil)
+                    XCTAssertEqual(
+                        (object["tool_choice"] as? [String: String])?["type"],
+                        webSearch && model == .pro ? "web_search" : nil
+                    )
+                }
+            }
+        }
+    }
+
+    func testModelChangePreservesVisibleTurnsAndReplaysOnlyMatchingModelItems() throws {
+        let items = try JSONDecoder().decode(
+            [GatewayResponseItem].self,
+            from: Data("""
+            [
+              {"type":"reasoning","id":"reasoning_1","summary":[]},
+              {"type":"message","role":"assistant","content":[{"type":"output_text","text":"答案"}]}
+            ]
+            """.utf8)
+        )
+        let legacyAnswer = AIConversationMessage(role: .assistant, text: "旧答案", responseItems: items)
+        var taggedAnswer = AIConversationMessage(role: .assistant, text: "答案", responseItems: items)
+        taggedAnswer.responseModel = .pro
+        let conversation = AIConversation(messages: [
+            AIConversationMessage(role: .user, text: "旧问题"), legacyAnswer,
+            AIConversationMessage(role: .user, text: "问题"), taggedAnswer
+        ])
+        let restored = try JSONDecoder().decode(
+            AIConversation.self,
+            from: JSONEncoder().encode(conversation)
+        )
+
+        let proHistory = restored.requestHistory(replayingResponseItemsFor: .pro)
+        XCTAssertNil(proHistory[1].responseItems)
+        XCTAssertEqual(proHistory[3].responseItems, items)
+
+        let flashHistory = restored.requestHistory(replayingResponseItemsFor: .flash)
+        XCTAssertEqual(flashHistory.map(\.content), ["旧问题", "旧答案", "问题", "答案"])
+        XCTAssertTrue(flashHistory.allSatisfy { $0.responseItems == nil })
+        let payload = try GatewayAskRequest(
+            question: "继续",
+            webSearch: true,
+            deepThinking: true,
+            history: flashHistory
+        )
+        let request = DeepSeekResponsesRequest(payload: payload, requestedModel: .flash)
+        let input = try XCTUnwrap(try jsonObject(request)["input"] as? [[String: String]])
+        XCTAssertEqual(input.compactMap { $0["content"] }, ["旧问题", "旧答案", "问题", "答案", "继续"])
     }
 
     func testThinkingSearchRequestCarriesHistoryAndUntrustedPageContext() throws {
@@ -128,7 +227,7 @@ final class DeepSeekProtocolTests: XCTestCase {
 
         XCTAssertEqual(object["model"] as? String, "deepseek-v4-pro")
         XCTAssertEqual(reasoning["effort"], "high")
-        XCTAssertEqual(object["max_output_tokens"] as? Int, 8_192)
+        XCTAssertEqual(object["max_output_tokens"] as? Int, 16_384)
         XCTAssertEqual(input.count, 5)
         XCTAssertEqual(input[0]["role"] as? String, "user")
         XCTAssertEqual(input[1]["type"] as? String, "reasoning")
@@ -375,7 +474,11 @@ final class DeepSeekProtocolTests: XCTestCase {
         let response = try JSONDecoder()
             .decode(DeepSeekResponsesResponse.self, from: strangeModel)
             .gatewayResponse(for: payload)
-        XCTAssertEqual(response.model, DeepSeekRequestPolicy.quickModel)
+        XCTAssertEqual(response.model, DeepSeekModel.flash.rawValue)
+        let explicitResponse = try JSONDecoder()
+            .decode(DeepSeekResponsesResponse.self, from: strangeModel)
+            .gatewayResponse(for: payload, requestedModel: .pro)
+        XCTAssertEqual(explicitResponse.model, DeepSeekModel.pro.rawValue)
     }
 
     func testIncompleteResponseUsesAccumulatedTextAndMarksTruncation() throws {
@@ -425,6 +528,28 @@ final class DeepSeekProtocolTests: XCTestCase {
         XCTAssertEqual(response.truncated, true)
     }
 
+    func testLongResponseKeepsAnswerAndReasoningAtNewLimits() throws {
+        let payload = try GatewayAskRequest(question: "解释", webSearch: false, deepThinking: true)
+        let decoded = try JSONDecoder().decode(
+            DeepSeekResponsesResponse.self, from: Data(#"{"status":"completed","output":[]}"#.utf8)
+        )
+        let answer = String(repeating: "答", count: DeepSeekRequestPolicy.maximumAnswerCharacters)
+        let reasoning = String(repeating: "想", count: DeepSeekRequestPolicy.maximumReasoningCharacters)
+        let result = try decoded.gatewayResponse(
+            for: payload, accumulatedAnswer: answer, accumulatedReasoning: reasoning
+        )
+        XCTAssertEqual(result.answer, answer)
+        XCTAssertEqual(result.reasoning, reasoning)
+        XCTAssertEqual(result.truncated, false)
+
+        let capped = try decoded.gatewayResponse(
+            for: payload, accumulatedAnswer: answer + "尾", accumulatedReasoning: reasoning + "尾"
+        )
+        XCTAssertEqual(capped.answer, answer)
+        XCTAssertEqual(capped.reasoning, reasoning)
+        XCTAssertEqual(capped.truncated, true)
+    }
+
     func testSSEByteParserHandlesCRLFAndSemanticEvents() throws {
         let stream = "event: response.output_text.delta\r\n"
             + "data: {\"type\":\"response.output_text.delta\",\"delta\":\"你好\"}\r\n\r\n"
@@ -464,5 +589,24 @@ final class DeepSeekProtocolTests: XCTestCase {
     private func jsonObject<T: Encodable>(_ value: T) throws -> [String: Any] {
         let data = try JSONEncoder().encode(value)
         return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    }
+}
+
+extension DeepSeekProtocolTests {
+    func testStreamedFormulaEscapesSurviveDecodingAndRenderAfterClosingDelimiter() throws {
+        let parts = [#"先配平：\["#, #"\ce{2H2 + "#, #"O2 -> 2H2O}\]"#]
+        var parser = DeepSeekSSEByteParser()
+        var answer = ""
+        for part in parts {
+            let payload = try JSONEncoder().encode(["type":"response.output_text.delta","delta": part])
+            let event = "data: " + String(decoding: payload, as: UTF8.self) + "\n\n"
+            for byte in event.utf8 {
+                if case .answerDelta(let text) = try parser.consume(byte: byte) {
+                    answer += text
+                }
+            }
+        }
+        XCTAssertEqual(answer, parts.joined())
+        XCTAssertEqual(String(AIMathText.attributed(answer).characters), "先配平：2H₂ + O₂ → 2H₂O")
     }
 }

@@ -45,6 +45,7 @@ interface DeepSeekResponsesRequest {
   reasoning: { effort: "none" | "high" };
   max_output_tokens: number;
   stream: boolean;
+  title?: { enabled: true };
   tools?: Array<{ type: "web_search" }>;
   tool_choice?: { type: "web_search" };
 }
@@ -53,6 +54,7 @@ interface DeepSeekResponseObject {
   status?: string;
   model?: string;
   output?: unknown[];
+  title?: unknown;
   error?: {
     code?: string;
     message?: string;
@@ -340,6 +342,7 @@ function modelInput(
       : MAX_OUTPUT_TOKENS,
     stream
   };
+  if (request.generate_title) input.title = { enabled: true };
   if (request.web_search) {
     input.tools = [{ type: "web_search" }];
     input.tool_choice = { type: "web_search" };
@@ -476,6 +479,15 @@ function deepSeekSearchResult(output: DeepSeekResponseObject): {
 function outputTruncated(output: DeepSeekResponseObject): boolean {
   return output.status === "incomplete"
     || output.incomplete_details?.reason === "max_output_tokens";
+}
+
+function conversationTitle(
+  request: AskRequest,
+  response: DeepSeekResponseObject
+): string | undefined {
+  if (!request.generate_title || response.status !== "completed") return undefined;
+  const title = response.title;
+  return typeof title === "string" && title.length <= 144 ? title : undefined;
 }
 
 function failureText(output: DeepSeekResponseObject): string {
@@ -843,6 +855,7 @@ export async function streamAI(
           web_search_used: deepSeekSearch.used,
           web_search_provider: deepSeekSearch.used ? "deepseek" : null,
           page_context_used: request.page !== null,
+          conversation_title: conversationTitle(request, event.response),
           ...(responseItems ? { response_items: responseItems } : {})
         });
         enqueue({
@@ -995,6 +1008,7 @@ export async function askAI(
     web_search_provider: deepSeekSearch.used ? "deepseek" : null,
     page_context_used: request.page !== null,
     truncated,
+    conversation_title: conversationTitle(request, output),
     ...(responseItems ? { response_items: responseItems } : {})
   };
 }

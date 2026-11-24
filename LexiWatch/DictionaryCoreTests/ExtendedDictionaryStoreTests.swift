@@ -32,6 +32,28 @@ func extendedSingleTokenPunctuationLookup() async throws {
     }
 }
 
+@Test("Oxford-style exact expressions survive outer punctuation from dictation")
+func extendedPhrasePunctuationLookup() async throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString)
+        .appendingPathExtension("sqlite")
+    defer { try? FileManager.default.removeItem(at: url) }
+    let entry = DictionaryEntry(
+        id: "test:at some point",
+        headword: "at some point",
+        meanings: [.init(partOfSpeech: "phrase", chinese: "某个时候")]
+    )
+    try createValidSQLite(at: url, headword: entry.headword, payload: JSONEncoder().encode(entry))
+    let store = ExtendedDictionaryStore(databaseURL: url)
+
+    for query in ["at some point", "At some point.", "“At some point.”", "At some point，", "At some point。"] {
+        let result = try await store.search(query, suggestionLimit: 0)
+        #expect(result.bestMatch?.entry == entry, "Query: \(query)")
+    }
+    let sentence = try await store.search("It happened at some point.", suggestionLimit: 0)
+    #expect(sentence.bestMatch == nil)
+}
+
 @Test("Extended dictionary resolves an ESDB inflection to its lemma")
 func extendedInflectionLookup() async throws {
     let store = ExtendedDictionaryStore(databaseURL: extendedDatabaseURL)

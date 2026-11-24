@@ -37,10 +37,11 @@ function fakeEnvironment(
   return { env, stubFetch };
 }
 
-function deepSeekJSON(answer = "AI answer"): Response {
+function deepSeekJSON(answer = "AI answer", title?: string): Response {
   return Response.json({
     status: "completed",
     model: QUICK_DEEPSEEK_MODEL,
+    title,
     output: [{
       type: "message",
       role: "assistant",
@@ -57,6 +58,34 @@ function apiRequest(path: string, init: RequestInit = {}, authorize = true): Req
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe("official conversation title", () => {
+  it.each(["/v1/ask", "/v1/ask/stream"])("returns the title from the only upstream call on %s", async (path) => {
+    const { env } = fakeEnvironment();
+    const upstream = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      expect(JSON.parse(String(init?.body))).toMatchObject({ title: { enabled: true } });
+      const result = deepSeekJSON("完整回答", "问题的主题");
+      if (path.endsWith("/stream")) {
+        const event = { type: "response.completed", response: await result.json() };
+        return new Response(`data: ${JSON.stringify(event)}\n\n`, {
+          headers: { "Content-Type": "text/event-stream" }
+        });
+      }
+      return result;
+    });
+    vi.stubGlobal("fetch", upstream);
+
+    const response = await worker.fetch(apiRequest(path, {
+      method: "POST",
+      headers: { "X-Wrist-Conversation-Title": "true" },
+      body: JSON.stringify({ question: "这个问题的主题是什么？" })
+    }), env);
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain('"conversation_title":"问题的主题"');
+    expect(upstream).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("public router", () => {

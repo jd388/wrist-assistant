@@ -1,4 +1,4 @@
-# 腕上助手 · Wrist Assistant
+# Wrist AI · 腕上助手
 
 **简体中文** · [English](README.en.md)
 
@@ -7,6 +7,13 @@
 腕上助手从国内初高中生的这个场景出发。如果你已经有 Apple Watch，又不想额外买一支词典笔，可以先在表上离线查 `address`，再翻译整句话。手表有网时，还能问 DeepSeek「为什么这里的 `address` 是『处理』的意思？」做题卡住了，也可以对它说「先给我一点提示，我想自己做。」
 
 它也面向平时想在 Apple Watch 上用 AI 的人。通勤时想到一个问题，或是手机不在手边，可以直接在表上问，想细聊就沿着同一段对话追问。
+
+## 0.9.27（66）
+
+- AI 对话使用 DeepSeek 官方会话标题。没有返回标题时，手表保留本地生成的标题。
+- 网页直读分段提取，最多读取 5 MB。达到预算时保留已读正文和链接，并提供 Safari 或可选的云端读取入口。
+- AI 回答支持常见数学和化学公式，可按需展开思考过程与搜索来源。
+- 表盘和智能叠放小组件可进入腕上助手，也可展示最近收藏、查词或 AI 提问。
 
 ## 手表上能做什么
 
@@ -22,7 +29,7 @@
 
 ## 构建
 
-需要 macOS、Xcode 及 watchOS SDK。打开 `WatchBrowser/WatchBrowser.xcodeproj`，选择 WatchBrowser scheme。可先在 watchOS Simulator 上运行；在实体设备上运行时请用自己的开发团队和唯一 Bundle ID 签名。修改 Watch 与伴侣 App 标识时，请保持 Watch 的伴侣标识设置与 iPhone App 一致。
+需要 macOS、Xcode 及 watchOS SDK。打开 `WatchBrowser/WatchBrowser.xcodeproj`，选择 WatchBrowser scheme。可先在 watchOS Simulator 上运行；在实体设备上运行时请用自己的开发团队和唯一 Bundle ID 签名。修改项目级 `IOS_COMPANION_BUNDLE_ID` 可同步更新 iPhone、Watch 和小组件的标识。
 
 ```sh
 xcodebuild -project WatchBrowser/WatchBrowser.xcodeproj -scheme WatchBrowser \
@@ -50,4 +57,4 @@ python3 Tools/build_extended_dictionary.py Tools/Data/esdb70_coverage.tsv /path/
   LexiWatchWatchApp/Resources/offline_dictionary.json LexiWatchWatchApp/Resources/offline_dictionary_extended.sqlite
 ```
 
-拥有可导入的本地牛津 MDX 时，可以使用 `LexiWatch/Tools/build_oxford_dictionary.py` 生成 `oxford_advanced_10_zh_hans.sqlite`，通过 Xcode 的 Copy Bundle Resources 加入个人构建。
+牛津导入工具需要 Python 的 `mdict-utils` 和 `lxml`。拥有可导入的本地牛津 MDX 时，可以使用 `LexiWatch/Tools/build_oxford_dictionary.py` 生成 `oxford_advanced_10_zh_hans.sqlite`，通过 Xcode 的 Copy Bundle Resources 加入个人构建。

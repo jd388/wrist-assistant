@@ -1,13 +1,24 @@
 import Foundation
 
+public enum DeepSeekModel: String, Codable, Sendable {
+    case flash = "deepseek-flash"
+    case pro = "deepseek-v4-pro"
+
+    init?(apiIdentifier: String) {
+        self.init(rawValue: apiIdentifier == "deepseek-v4-flash" ? Self.flash.rawValue : apiIdentifier)
+    }
+}
+
 enum DeepSeekRequestPolicy {
-    static let quickModel = "deepseek-flash"
-    static let thinkingModel = "deepseek-v4-pro"
-    static let quickMaxOutputTokens = 2_048
-    static let thinkingMaxOutputTokens = 8_192
-    static let maximumAnswerCharacters = 8_000
-    static let maximumReasoningCharacters = 6_000
-    static let maximumResponseBytes = 2_000_000
+    static func automaticModel(deepThinking: Bool) -> DeepSeekModel {
+        deepThinking ? .pro : .flash
+    }
+
+    static let quickMaxOutputTokens = 4_096
+    static let thinkingMaxOutputTokens = 16_384
+    static let maximumAnswerCharacters = 16_000
+    static let maximumReasoningCharacters = 24_000
+    static let maximumResponseBytes = 8_000_000
     static let maximumSSELineBytes = 512 * 1_024
 
     static let instructions = """
@@ -66,6 +77,10 @@ struct DeepSeekResponsesRequest: Encodable, Equatable, Sendable {
         let type: String
     }
 
+    struct Title: Encodable, Equatable, Sendable {
+        let enabled: Bool
+    }
+
     let model: String
     let instructions: String
     let input: [InputItem]
@@ -74,6 +89,7 @@ struct DeepSeekResponsesRequest: Encodable, Equatable, Sendable {
     let stream: Bool
     let tools: [Tool]?
     let toolChoice: ToolChoice?
+    let title: Title?
 
     enum CodingKeys: String, CodingKey {
         case model
@@ -84,15 +100,18 @@ struct DeepSeekResponsesRequest: Encodable, Equatable, Sendable {
         case stream
         case tools
         case toolChoice = "tool_choice"
+        case title
     }
 
-    init(payload: GatewayAskRequest) {
-        model = payload.deepThinking
-            ? DeepSeekRequestPolicy.thinkingModel
-            : DeepSeekRequestPolicy.quickModel
+    init(payload: GatewayAskRequest, requestedModel: DeepSeekModel? = nil, generateTitle: Bool = false) {
+        let selectedModel = requestedModel ?? DeepSeekRequestPolicy.automaticModel(
+            deepThinking: payload.deepThinking
+        )
+        model = selectedModel.rawValue
         instructions = DeepSeekRequestPolicy.instructions
 
-        let requiresTranscriptFallback = payload.deepThinking
+        let requiresTranscriptFallback = selectedModel == .pro
+            && payload.deepThinking
             && payload.webSearch
             && payload.history.contains {
                 $0.role == .assistant && $0.responseItems == nil
@@ -125,13 +144,16 @@ struct DeepSeekResponsesRequest: Encodable, Equatable, Sendable {
         maxOutputTokens = payload.deepThinking
             ? DeepSeekRequestPolicy.thinkingMaxOutputTokens
             : DeepSeekRequestPolicy.quickMaxOutputTokens
+        title = generateTitle && payload.mode == .answer && payload.page == nil
+            ? Title(enabled: true)
+            : nil
         stream = true
         // Flash uses the current server search tool; it cannot be forced by tool_choice.
         // Pro retains its supported web_search contract and explicit tool selection.
         tools = payload.webSearch
-            ? [Tool(type: payload.deepThinking ? "web_search" : "deepseek_web_search")]
+            ? [Tool(type: selectedModel == .pro ? "web_search" : "deepseek_web_search")]
             : nil
-        toolChoice = payload.webSearch && payload.deepThinking
+        toolChoice = payload.webSearch && selectedModel == .pro
             ? ToolChoice(type: "web_search")
             : nil
     }
@@ -306,6 +328,7 @@ struct DeepSeekResponsesResponse: Decodable, Sendable {
     let rawOutput: [GatewayResponseItem]?
     let error: Failure?
     let incompleteDetails: IncompleteDetails?
+    let title: String?
 
     enum CodingKeys: String, CodingKey {
         case status
@@ -313,12 +336,14 @@ struct DeepSeekResponsesResponse: Decodable, Sendable {
         case output
         case error
         case incompleteDetails = "incomplete_details"
+        case title
     }
 
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         status = try values.decodeIfPresent(String.self, forKey: .status)
         model = try values.decodeIfPresent(String.self, forKey: .model)
+        title = try? values.decodeIfPresent(String.self, forKey: .title)
         output = try values.decodeIfPresent([OutputItem].self, forKey: .output)
         error = try values.decodeIfPresent(Failure.self, forKey: .error)
         incompleteDetails = try values.decodeIfPresent(
@@ -337,6 +362,7 @@ struct DeepSeekResponsesResponse: Decodable, Sendable {
 
     func gatewayResponse(
         for payload: GatewayAskRequest,
+        requestedModel: DeepSeekModel? = nil,
         accumulatedAnswer: String = "",
         accumulatedReasoning: String = "",
         streamWasCapped: Bool = false
@@ -383,22 +409,15 @@ struct DeepSeekResponsesResponse: Decodable, Sendable {
 
         let usedWebSearch = payload.webSearch
             && outputItems.contains { $0.type == "web_search_call" }
-        let expectedModel = payload.deepThinking
-            ? DeepSeekRequestPolicy.thinkingModel
-            : DeepSeekRequestPolicy.quickModel
-        let safeModel: String
-        if let model,
-           model == DeepSeekRequestPolicy.quickModel
-               || model == DeepSeekRequestPolicy.thinkingModel {
-            safeModel = model
-        } else {
-            safeModel = expectedModel
-        }
+        let expectedModel = requestedModel ?? DeepSeekRequestPolicy.automaticModel(
+            deepThinking: payload.deepThinking
+        )
+        let safeModel = model.flatMap(DeepSeekModel.init(apiIdentifier:)) ?? expectedModel
         return GatewayAskResponse(
             answer: answer,
             reasoning: reasoning,
             citations: citations(),
-            model: safeModel,
+            model: safeModel.rawValue,
             webSearchUsed: usedWebSearch,
             webSearchProvider: usedWebSearch ? .other("deepseek") : nil,
             pageContextUsed: payload.page != nil,
@@ -407,7 +426,8 @@ struct DeepSeekResponsesResponse: Decodable, Sendable {
                 || answerWasCapped
                 || reasoningWasCapped
                 || streamWasCapped,
-            responseItems: rawOutput
+            responseItems: rawOutput,
+            conversationTitle: status == "completed" ? title : nil
         )
     }
 

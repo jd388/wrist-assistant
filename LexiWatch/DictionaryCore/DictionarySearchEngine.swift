@@ -152,6 +152,10 @@ public struct DictionarySearchEngine: Sendable {
         self.fuzzyUnitStorage = fuzzyUnitStorage
     }
 
+    static func preferredChineseHeadwords(for rawQuery: String) -> [String] {
+        preferredChineseTranslations[normalize(rawQuery)] ?? []
+    }
+
     public func search(_ rawQuery: String, suggestionLimit: Int = 5) -> SearchResponse {
         let query = Self.normalize(rawQuery)
         let emptyResponse = SearchResponse(

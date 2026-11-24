@@ -2,6 +2,40 @@ import Foundation
 import Testing
 @testable import DictionaryCore
 
+@Test func numberedOxfordFavoriteMatchesTheCanonicalSpelling() {
+    let entry = DictionaryEntry(id: "oxford-10:lie", headword: "lie",
+        aliases: ["lie1", "lie2"], meanings: [.init(partOfSpeech: "verb", chinese: "躺")])
+    #expect(FavoriteWord(id: "oxford-10:lie2", headword: "lie2", conciseChinese: "说谎").matches(entry))
+    #expect(!FavoriteWord(id: "other:lie2", headword: "lie2", conciseChinese: "说谎").matches(entry))
+}
+
+@Test("Entry decoding keeps regional phonetics and sense-specific collocations")
+func entryDecodesOxfordSenseDetails() throws {
+    let payload = """
+    {
+        "id": "oxford-test:make", "headword": "make",
+        "regionalPronunciations": [
+            {"ipa": "meɪk", "region": "uk", "partOfSpeech": "verb"},
+            {"ipa": "meɪk", "region": "us", "partOfSpeech": "verb"}
+        ],
+        "meanings": [
+            {"partOfSpeech": "verb", "chinese": "作出", "collocations": [],
+             "collocationDetails": [{"text": "make a choice", "kind": "fixedPhrase", "chinese": "",
+                                     "exampleChinese": "她作出了选择。", "priority": 10}]},
+            {"partOfSpeech": "verb", "chinese": "做", "collocations": []}
+        ],
+        "relatedExpressions": [
+            {"text": "make up", "kind": "phrasalVerb", "chinese": "组成", "priority": 0, "partOfSpeech": "verb"}
+        ]
+    }
+    """
+    let entry = try JSONDecoder().decode(DictionaryEntry.self, from: Data(payload.utf8))
+    #expect(entry.regionalPronunciations.map(\.region) == [.uk, .us])
+    #expect(entry.meanings[0].collocationDetails?.first?.exampleChinese == "她作出了选择。")
+    #expect(entry.meanings[1].collocationDetails == nil)
+    #expect(entry.relatedExpressions.first?.partOfSpeech == "verb")
+}
+
 @Test("Fast key normalization preserves word boundaries and Unicode input")
 func fastKeyNormalizationKeepsLookupSemantics() {
     for (input, expected) in [
@@ -702,6 +736,16 @@ func unknownPreservesQuery() {
     let result = DictionarySearchEngine(entries: fixtures).search("不在词库")
     #expect(result.query == "不在词库")
     #expect(result.exactMatches.isEmpty)
+}
+
+@Test("Spaced English spelling has an exact-lookup fallback without stripping internal marks")
+func spacedEnglishSpellingCandidate() {
+    #expect(UnifiedLookupPolicy.joinedEnglishSpellingCandidate(for: "a p p l e") == "apple")
+    #expect(UnifiedLookupPolicy.joinedEnglishSpellingCandidate(for: "ＡＰ ple。") == "apple")
+    #expect(UnifiedLookupPolicy.joinedEnglishSpellingCandidate(for: "dic tion ary") == "dictionary")
+    #expect(UnifiedLookupPolicy.joinedEnglishSpellingCandidate(for: "at some-point") == nil)
+    #expect(UnifiedLookupPolicy.joinedEnglishSpellingCandidate(for: "a 苹果") == nil)
+    #expect(UnifiedLookupPolicy.joinedEnglishSpellingCandidate(for: "apple") == nil)
 }
 
 @Test("Unified entry keeps exact words and phrases in the learning dictionary")

@@ -13,7 +13,8 @@ final class DeepSeekService: @unchecked Sendable {
 
         mutating func apply(
             _ event: DeepSeekResponsesStreamEvent,
-            payload: GatewayAskRequest
+            payload: GatewayAskRequest,
+            requestedModel: DeepSeekModel?
         ) throws -> [GatewayAskStreamEvent] {
             switch event {
             case .reasoningDelta(let text):
@@ -39,6 +40,7 @@ final class DeepSeekService: @unchecked Sendable {
             case .completed(let response), .incomplete(let response):
                 let final = try response.gatewayResponse(
                     for: payload,
+                    requestedModel: requestedModel,
                     accumulatedAnswer: answer,
                     accumulatedReasoning: reasoning,
                     streamWasCapped: answerWasCapped || reasoningWasCapped
@@ -52,7 +54,8 @@ final class DeepSeekService: @unchecked Sendable {
                             webSearchUsed: final.webSearchUsed,
                             webSearchProvider: final.webSearchProvider,
                             pageContextUsed: final.pageContextUsed,
-                            responseItems: final.responseItems
+                            responseItems: final.responseItems,
+                            conversationTitle: final.conversationTitle
                         )
                     ),
                     .done(
@@ -90,7 +93,7 @@ final class DeepSeekService: @unchecked Sendable {
         configuration.allowsExpensiveNetworkAccess = true
         configuration.allowsConstrainedNetworkAccess = true
         configuration.timeoutIntervalForRequest = 90
-        configuration.timeoutIntervalForResource = 180
+        configuration.timeoutIntervalForResource = 600
         configuration.httpMaximumConnectionsPerHost = 2
         let redirectDelegate = RejectingRedirectDelegate()
         self.redirectDelegate = redirectDelegate
@@ -105,8 +108,8 @@ final class DeepSeekService: @unchecked Sendable {
         session.invalidateAndCancel()
     }
 
-    static func requestBody(for payload: GatewayAskRequest) throws -> Data {
-        let body = try JSONEncoder().encode(DeepSeekResponsesRequest(payload: payload))
+    static func requestBody(for request: DeepSeekResponsesRequest) throws -> Data {
+        let body = try JSONEncoder().encode(request)
         guard body.count <= GatewayRequestPolicy.maximumAskRequestBytes else {
             throw DeepSeekServiceError.requestTooLarge
         }
@@ -116,11 +119,15 @@ final class DeepSeekService: @unchecked Sendable {
     func answerStreaming(
         _ payload: GatewayAskRequest,
         apiKey: String,
+        requestedModel: DeepSeekModel? = nil,
+        generateTitle: Bool = false,
         onEvent: @escaping @Sendable (GatewayAskStreamEvent) async -> Void
     ) async throws -> GatewayAskResponse {
         let credential = try normalizedCredential(apiKey)
-        let deepSeekPayload = DeepSeekResponsesRequest(payload: payload)
-        let requestBody = try Self.requestBody(for: payload)
+        let deepSeekPayload = DeepSeekResponsesRequest(
+            payload: payload, requestedModel: requestedModel, generateTitle: generateTitle
+        )
+        let requestBody = try Self.requestBody(for: deepSeekPayload)
 
         var request = URLRequest(url: Self.responsesEndpoint)
         request.httpMethod = "POST"
@@ -179,14 +186,14 @@ final class DeepSeekService: @unchecked Sendable {
                     throw DeepSeekServiceError.responseTooLarge
                 }
                 guard let event = try parser.consume(byte: byte) else { continue }
-                for watchEvent in try accumulator.apply(event, payload: payload) {
+                for watchEvent in try accumulator.apply(event, payload: payload, requestedModel: requestedModel) {
                     await onEvent(watchEvent)
                 }
                 if let result = accumulator.result { return result }
             }
 
             if let event = try parser.finish() {
-                for watchEvent in try accumulator.apply(event, payload: payload) {
+                for watchEvent in try accumulator.apply(event, payload: payload, requestedModel: requestedModel) {
                     await onEvent(watchEvent)
                 }
             }

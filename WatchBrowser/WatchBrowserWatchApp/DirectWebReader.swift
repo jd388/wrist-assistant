@@ -37,7 +37,7 @@ struct DirectWebLoadResult: Sendable {
 }
 
 final class DirectWebLoader: @unchecked Sendable {
-    static let maximumResponseBytes = 1_500_000
+    static let maximumResponseBytes = 5_000_000
     private let session: URLSession
 
     init() {
@@ -77,6 +77,7 @@ final class DirectWebLoader: @unchecked Sendable {
         )
 
         let (bytes, response) = try await session.bytes(for: request)
+        defer { bytes.task.cancel() }
         try Task.checkCancellation()
 
         guard let http = response as? HTTPURLResponse else {
@@ -85,27 +86,57 @@ final class DirectWebLoader: @unchecked Sendable {
         guard (200..<300).contains(http.statusCode) else {
             throw DirectWebReaderError.httpStatus(http.statusCode)
         }
-        if http.expectedContentLength > Int64(Self.maximumResponseBytes) {
-            throw DirectWebReaderError.pageTooLarge
+        let finalURL = http.url ?? url
+        let declaredLength = http.expectedContentLength
+        var data = Data()
+        data.reserveCapacity(65_536)
+        var nextPreviewSize = 128 * 1_024
+        var reachedDownloadLimit = false
+
+        func extract(isPartial: Bool) throws -> DirectWebDocument {
+            try DirectWebDocumentParser.parse(
+                data: data,
+                responseURL: finalURL,
+                mimeType: http.mimeType,
+                textEncodingName: http.textEncodingName,
+                isPartial: isPartial
+            )
         }
 
-        var data = Data()
-        data.reserveCapacity(min(Self.maximumResponseBytes, 65_536))
         for try await byte in bytes {
             try Task.checkCancellation()
-            guard data.count < Self.maximumResponseBytes else {
-                throw DirectWebReaderError.pageTooLarge
+            // When an advertised response fits exactly, allow EOF to confirm it.
+            if data.count == Self.maximumResponseBytes {
+                reachedDownloadLimit = true
+                break
             }
             data.append(byte)
+
+            if data.count == Self.maximumResponseBytes,
+               declaredLength != Int64(data.count) {
+                reachedDownloadLimit = true
+                break
+            }
+            if data.count == nextPreviewSize {
+                // Doubling checkpoints keeps total reparsing proportional to bytes read.
+                nextPreviewSize *= 2
+                if declaredLength != Int64(data.count),
+                   let preview = try? extract(isPartial: true),
+                   preview.text.count >= DirectWebDocumentParser.maximumTextCharacters {
+                    try Task.checkCancellation()
+                    return DirectWebLoadResult(document: preview, finalURL: finalURL)
+                }
+            }
         }
 
-        let finalURL = http.url ?? url
-        let document = try DirectWebDocumentParser.parse(
-            data: data,
-            responseURL: finalURL,
-            mimeType: http.mimeType,
-            textEncodingName: http.textEncodingName
-        )
+        let document: DirectWebDocument
+        do {
+            document = try extract(isPartial: reachedDownloadLimit)
+        } catch DirectWebDocumentError.emptyBody where reachedDownloadLimit {
+            throw DirectWebReaderError.pageTooLarge
+        } catch DirectWebDocumentError.searchResultsUnavailable where reachedDownloadLimit {
+            throw DirectWebReaderError.pageTooLarge
+        }
         try Task.checkCancellation()
         return DirectWebLoadResult(document: document, finalURL: finalURL)
     }
@@ -445,7 +476,7 @@ enum DirectWebReaderError: LocalizedError, Equatable, Sendable {
         case .invalidResponse:
             return "网站没有返回可识别的网页响应。可以重试或使用兼容模式。"
         case .pageTooLarge:
-            return "网页内容超过手表直接读取上限。请返回并使用兼容模式。"
+            return "手表在读取上限内未找到正文。可试用云端读取或 Safari。"
         case .httpStatus(let status):
             switch status {
             case 401, 403:
@@ -705,7 +736,30 @@ struct DirectWebReaderView: View {
                 .font(.system(size: 9))
                 .foregroundStyle(reader.source == .direct ? Color.cyan : Color.green)
 
-            if document.isLikelyDynamic {
+            if document.wasTruncated {
+                VStack(alignment: .leading, spacing: 5) {
+                    Label("已显示部分正文", systemImage: "scissors")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                    if reader.source == .direct, hasGatewayConfiguration {
+                        Button {
+                            reader.openThroughGateway(
+                                serverURL: serverURL,
+                                token: accessToken,
+                                preferDynamic: document.isLikelyDynamic
+                            )
+                        } label: {
+                            Label("用云端读取", systemImage: "text.document")
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    Button(action: openCurrentURLWithSystem) {
+                        Label("用 Safari 打开", systemImage: "safari.fill")
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .font(.caption2)
+            } else if document.isLikelyDynamic {
                 VStack(alignment: .leading, spacing: 5) {
                     Label("此网页主要依赖脚本，直读内容可能不完整。", systemImage: "exclamationmark.circle")
                         .font(.system(size: 9))
@@ -734,12 +788,6 @@ struct DirectWebReaderView: View {
             Text(document.text)
                 .font(.body)
                 .frame(maxWidth: .infinity, alignment: .leading)
-
-            if document.wasTruncated {
-                Label("正文较长，已在手表安全长度处截断。", systemImage: "scissors")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.orange)
-            }
 
             if let pageContext = reader.currentPageContext {
                 HStack(spacing: 5) {
@@ -819,7 +867,7 @@ struct DirectWebReaderView: View {
     private func openCurrentURLWithSystem() {
         guard let url = reader.targetURL else { return }
         if #available(watchOS 26.0, *) {
-            systemOpenNotice = "已交给系统网页；若仍无法载入，请返回继续使用直读。"
+            systemOpenNotice = nil
             openURL(url, prefersInApp: true)
         } else {
             systemOpenNotice = "当前 watchOS 不支持应用内系统网页。"

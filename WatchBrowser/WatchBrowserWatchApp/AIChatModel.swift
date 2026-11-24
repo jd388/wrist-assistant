@@ -1,6 +1,36 @@
 import Foundation
 import WatchKit
 
+enum AIReplyPreferenceKey {
+    static let model = "aiReplyModel"
+    static let deepThinking = "aiReplyDeepThinking"
+    static let webSearch = "aiReplyWebSearch"
+    static let showReasoning = "aiReplyShowReasoning"
+    static let showSources = "aiReplyShowSources"
+}
+
+enum AIReplyModelSelection: String, CaseIterable {
+    case automatic
+    case flash
+    case pro
+
+    var title: String {
+        switch self {
+        case .automatic: "自动"
+        case .flash: "DeepSeek Flash"
+        case .pro: "DeepSeek Pro"
+        }
+    }
+
+    func resolve(deepThinking: Bool) -> DeepSeekModel {
+        switch self {
+        case .automatic: DeepSeekRequestPolicy.automaticModel(deepThinking: deepThinking)
+        case .flash: .flash
+        case .pro: .pro
+        }
+    }
+}
+
 @MainActor
 final class AIChatModel: ObservableObject {
     enum Phase: Equatable {
@@ -33,6 +63,7 @@ final class AIChatModel: ObservableObject {
         let assistantMessageID: UUID
         let question: String
         let deepThinking: Bool
+        let webSearch: Bool
         let requestPath: AIRequestPath
         var metadata: GatewayAskStreamMetadata?
     }
@@ -132,13 +163,14 @@ final class AIChatModel: ObservableObject {
 
     var messages: [AIConversationMessage] { currentConversation.messages }
     var isAsking: Bool { phase == .asking }
-    var webSearchEnabled: Bool { currentConversation.webSearchEnabled }
-    var deepThinkingEnabled: Bool { currentConversation.deepThinkingEnabled }
+    var isDraftTooLong: Bool {
+        draft.count > GatewayRequestPolicy.maximumQuestionCharacters
+            || draft.utf8.count > GatewayRequestPolicy.maximumQuestionBytes
+    }
     var canSendDraft: Bool {
         !isAsking
             && !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && draft.count <= GatewayRequestPolicy.maximumQuestionCharacters
-            && draft.utf8.count <= GatewayRequestPolicy.maximumQuestionBytes
+            && !isDraftTooLong
     }
     var canSubmitQuestionEdit: Bool {
         let normalized = questionEditDraft.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -152,26 +184,11 @@ final class AIChatModel: ObservableObject {
     var loadingMessage: String {
         if initialTask == .summarize { return "正在总结当前内容…" }
         if initialTask == .pageQuestion { return "正在根据当前内容回答…" }
-        if webSearchEnabled { return deepThinkingEnabled ? "正在检索资料并深度思考…" : "正在检索资料…" }
-        return deepThinkingEnabled ? "正在深度思考…" : "正在生成回答…"
-    }
-
-    func setWebSearchEnabled(_ enabled: Bool) {
-        guard initialTask == .webQuestion, !isAsking else { return }
-        mutateConversation(selectedConversationID) { conversation in
-            conversation.webSearchEnabled = enabled
-            conversation.updatedAt = Date()
+        let isThinking = activeAttempt?.deepThinking == true
+        if activeAttempt?.webSearch == true {
+            return isThinking ? "正在检索资料并深度思考…" : "正在检索资料…"
         }
-        persist()
-    }
-
-    func setDeepThinkingEnabled(_ enabled: Bool) {
-        guard !isAsking else { return }
-        mutateConversation(selectedConversationID) { conversation in
-            conversation.deepThinkingEnabled = enabled
-            conversation.updatedAt = Date()
-        }
-        persist()
+        return isThinking ? "正在深度思考…" : "正在生成回答…"
     }
 
     func send(
@@ -405,6 +422,23 @@ final class AIChatModel: ObservableObject {
             return false
         }
 
+        let defaults = UserDefaults.standard
+        let isWebQuestion = initialTask == .webQuestion
+        let deepThinking = defaults.bool(forKey: AIReplyPreferenceKey.deepThinking)
+        let webSearch = isWebQuestion && defaults.bool(forKey: AIReplyPreferenceKey.webSearch)
+        let automaticModel = DeepSeekRequestPolicy.automaticModel(deepThinking: deepThinking)
+        let savedModel = defaults.string(forKey: AIReplyPreferenceKey.model)
+            .flatMap(AIReplyModelSelection.init(rawValue:)) ?? .automatic
+        let model = isWebQuestion
+            ? savedModel.resolve(deepThinking: deepThinking)
+            : automaticModel
+        if transport.path == .cloudflareDeepSeekProxy,
+           model != automaticModel || (webSearch && model == .flash) {
+            if existingUserMessageID == nil { draft = question }
+            phase = .failed("当前模型组合需要手表直连 DeepSeek。请配置 API Key，或在设置中选择自动并关闭联网搜索。")
+            return false
+        }
+
         let conversationID = selectedConversationID
         var proposedConversation = currentConversation
         let userMessageID: UUID
@@ -422,16 +456,27 @@ final class AIChatModel: ObservableObject {
             userMessageID = user.id
             proposedConversation.append(user)
         }
-        let history = proposedConversation.requestHistory(excludingMessageID: userMessageID)
-        let assistant = AIConversationMessage(
+        let history = proposedConversation.requestHistory(
+            excludingMessageID: userMessageID,
+            replayingResponseItemsFor: model
+        )
+        var assistant = AIConversationMessage(
             role: .assistant,
             text: "",
             status: .pending
         )
+        assistant.answerOptions = AIAnswerOptions(
+            modelIdentifier: model.rawValue,
+            deepThinking: deepThinking,
+            webSearch: webSearch
+        )
 
+        let generateTitle = persistsConversations
+            && proposedConversation.titleIsAutomatic
+            && proposedConversation.generatedTitleQuestionID == nil
+            && proposedConversation.topicQuestion?.id == userMessageID
         let generation = UUID()
         let requestID = UUID().uuidString.lowercased()
-        let deepThinking = proposedConversation.deepThinkingEnabled
         let mode: GatewayAskMode = initialTask == .summarize ? .summarize : .answer
         let request: GatewayAskRequest
         do {
@@ -439,8 +484,7 @@ final class AIChatModel: ObservableObject {
                 requestID: requestID,
                 question: question,
                 mode: mode,
-                webSearch: initialTask == .webQuestion
-                    && proposedConversation.webSearchEnabled,
+                webSearch: webSearch,
                 deepThinking: deepThinking,
                 history: history,
                 page: initialTask == .webQuestion ? nil : pageContext
@@ -453,7 +497,11 @@ final class AIChatModel: ObservableObject {
         do {
             switch transport {
             case .directDeepSeek:
-                _ = try DeepSeekService.requestBody(for: request)
+                _ = try DeepSeekService.requestBody(
+                    for: DeepSeekResponsesRequest(
+                        payload: request, requestedModel: model, generateTitle: generateTitle
+                    )
+                )
             case .cloudflareDeepSeekProxy:
                 _ = try GatewayClient.askRequestBody(for: request)
             }
@@ -472,6 +520,7 @@ final class AIChatModel: ObservableObject {
             assistantMessageID: assistant.id,
             question: question,
             deepThinking: deepThinking,
+            webSearch: webSearch,
             requestPath: transport.path,
             metadata: nil
         )
@@ -486,6 +535,8 @@ final class AIChatModel: ObservableObject {
             guard let self else { return }
             await self.perform(
                 request,
+                model: model,
+                generateTitle: generateTitle,
                 generation: generation,
                 transport: transport
             )
@@ -495,6 +546,8 @@ final class AIChatModel: ObservableObject {
 
     private func perform(
         _ request: GatewayAskRequest,
+        model: DeepSeekModel,
+        generateTitle: Bool,
         generation: UUID,
         transport: RequestTransport
     ) async {
@@ -504,7 +557,9 @@ final class AIChatModel: ObservableObject {
             case .directDeepSeek(let apiKey):
                 result = try await deepSeek.answerStreaming(
                     request,
-                    apiKey: apiKey
+                    apiKey: apiKey,
+                    requestedModel: model,
+                    generateTitle: generateTitle
                 ) { [weak self] event in
                     await self?.apply(event, generation: generation)
                 }
@@ -512,13 +567,14 @@ final class AIChatModel: ObservableObject {
                 result = try await gateway.answerStreaming(
                     request,
                     serverURL: serverURL,
-                    token: token
+                    token: token,
+                    generateTitle: generateTitle
                 ) { [weak self] event in
                     await self?.apply(event, generation: generation)
                 }
             }
             try Task.checkCancellation()
-            finish(result, generation: generation)
+            finish(result, generation: generation, acceptsTitle: generateTitle)
         } catch is CancellationError {
             return
         } catch {
@@ -539,12 +595,11 @@ final class AIChatModel: ObservableObject {
                 message.citations = metadata.citations
                 if let responseItems = metadata.responseItems {
                     message.responseItems = responseItems
+                message.responseModel = DeepSeekModel(apiIdentifier: metadata.model)
                 }
-                message.answerBasis = Self.answerBasis(
-                    for: metadata,
-                    deepThinking: attempt.deepThinking,
-                    requestPath: attempt.requestPath
-                )
+                if !metadata.model.isEmpty {
+                    message.answerOptions?.modelIdentifier = metadata.model
+                }
             }
             persist()
         case .reasoningDelta(let text):
@@ -553,7 +608,7 @@ final class AIChatModel: ObservableObject {
                 messageID: attempt.assistantMessageID
             ) { message in
                 let current = message.reasoning ?? ""
-                let remaining = max(0, 6_000 - current.count)
+                let remaining = max(0, DeepSeekRequestPolicy.maximumReasoningCharacters - current.count)
                 message.reasoning = current + String(text.prefix(remaining))
             }
         case .delta(let text):
@@ -561,7 +616,7 @@ final class AIChatModel: ObservableObject {
                 conversationID: attempt.conversationID,
                 messageID: attempt.assistantMessageID
             ) { message in
-                let remaining = max(0, 8_000 - message.text.count)
+                let remaining = max(0, DeepSeekRequestPolicy.maximumAnswerCharacters - message.text.count)
                 message.text += String(text.prefix(remaining))
             }
         case .done(let answer, let reasoning, let truncated):
@@ -584,7 +639,7 @@ final class AIChatModel: ObservableObject {
         }
     }
 
-    private func finish(_ result: GatewayAskResponse, generation: UUID) {
+    private func finish(_ result: GatewayAskResponse, generation: UUID, acceptsTitle: Bool) {
         guard let attempt = activeAttempt, attempt.generation == generation else { return }
         mutateMessage(
             conversationID: attempt.conversationID,
@@ -597,12 +652,19 @@ final class AIChatModel: ObservableObject {
             message.citations = result.citations
             message.wasTruncated = result.truncated ?? false
             message.responseItems = result.responseItems
-            message.answerBasis = Self.answerBasis(
-                for: result,
-                deepThinking: attempt.deepThinking,
-                requestPath: attempt.requestPath
-            )
+            message.responseModel = DeepSeekModel(apiIdentifier: result.model)
+            if !result.model.isEmpty {
+                message.answerOptions?.modelIdentifier = result.model
+            }
             message.status = .completed
+        }
+        if acceptsTitle, let title = result.conversationTitle {
+            mutateConversation(attempt.conversationID) { conversation in
+                guard let question = conversation.topicQuestion,
+                      question.id == attempt.userMessageID,
+                      question.text == attempt.question else { return }
+                conversation.applyGeneratedTitle(title, for: question)
+            }
         }
         activeAttempt = nil
         requestTask = nil
@@ -669,6 +731,7 @@ final class AIChatModel: ObservableObject {
                 )
             )
             storageWarning = nil
+            AssistantActivityPublisher.publishAI(conversations)
         } catch {
             storageWarning = "对话已显示，但暂时无法保存到手表。"
         }
@@ -706,79 +769,6 @@ final class AIChatModel: ObservableObject {
         } else if !message.answerBasis.contains("已中断") {
             message.answerBasis += " · 已中断"
         }
-    }
-
-    private static func answerBasis(
-        for response: GatewayAskResponse,
-        deepThinking: Bool,
-        requestPath: AIRequestPath
-    ) -> String {
-        answerBasis(
-            modelIdentifier: response.model,
-            webSearchUsed: response.webSearchUsed,
-            webSearchProvider: response.webSearchProvider,
-            pageContextUsed: response.pageContextUsed,
-            deepThinking: deepThinking,
-            requestPath: requestPath
-        )
-    }
-
-    private static func answerBasis(
-        for metadata: GatewayAskStreamMetadata,
-        deepThinking: Bool,
-        requestPath: AIRequestPath
-    ) -> String {
-        answerBasis(
-            modelIdentifier: metadata.model,
-            webSearchUsed: metadata.webSearchUsed,
-            webSearchProvider: metadata.webSearchProvider,
-            pageContextUsed: metadata.pageContextUsed,
-            deepThinking: deepThinking,
-            requestPath: requestPath
-        )
-    }
-
-    private static func answerBasis(
-        modelIdentifier: String,
-        webSearchUsed: Bool,
-        webSearchProvider: GatewayWebSearchProvider?,
-        pageContextUsed: Bool,
-        deepThinking: Bool,
-        requestPath: AIRequestPath
-    ) -> String {
-        let model: String
-        if modelIdentifier.contains("deepseek-v4-pro") {
-            model = "DeepSeek V4 Pro 官方 API"
-        } else if modelIdentifier.contains("deepseek-v4-flash") {
-            model = "DeepSeek V4 Flash 官方 API"
-        } else if modelIdentifier.contains("qwen3-30b") {
-            model = "Qwen3 30B（旧回答）"
-        } else if modelIdentifier.contains("deepseek-r1-distill") {
-            model = "DeepSeek-R1 Distill（旧回答）"
-        } else if modelIdentifier.contains("llama-3.2-3b") {
-            model = "Llama 3.2（旧回答）"
-        } else {
-            model = modelIdentifier
-        }
-        var parts = [model]
-        if requestPath == .cloudflareDeepSeekProxy {
-            parts.append("Cloudflare 免费转发")
-        }
-        parts.append(deepThinking ? "深度思考" : "快速回答")
-        if pageContextUsed {
-            parts.append("当前内容")
-        }
-        if webSearchUsed {
-            switch webSearchProvider {
-            case .other("deepseek"):
-                parts.append("DeepSeek 联网搜索")
-            case .wikimedia:
-                parts.append("Wikimedia 开放资料")
-            default:
-                parts.append("在线资料检索")
-            }
-        }
-        return parts.joined(separator: " · ")
     }
 
     private func requestTransport(

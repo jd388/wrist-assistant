@@ -2,6 +2,28 @@ import XCTest
 @testable import BrowserCore
 
 final class AIConversationTests: XCTestCase {
+    func testLongAnswerSurvivesStorageAndKeepsBoundedContext() throws {
+        let answer = String(repeating: "答", count: DeepSeekRequestPolicy.maximumAnswerCharacters)
+        let reasoning = String(repeating: "想", count: DeepSeekRequestPolicy.maximumReasoningCharacters)
+        let conversation = AIConversation(messages: [
+            AIConversationMessage(role: .user, text: "原问题"),
+            AIConversationMessage(role: .assistant, text: answer, reasoning: reasoning)
+        ])
+        let archive = AIConversationArchive(
+            conversations: [conversation], selectedConversationID: conversation.id
+        )
+        let restored = try JSONDecoder().decode(
+            AIConversationArchive.self, from: JSONEncoder().encode(archive.compacted())
+        )
+        let saved = try XCTUnwrap(restored.conversations.first)
+        XCTAssertEqual(saved.messages.last?.text, answer)
+        XCTAssertEqual(saved.messages.last?.reasoning, reasoning)
+        let history = saved.requestHistory()
+        XCTAssertEqual(history.map(\.role), [.user, .assistant])
+        XCTAssertEqual(history.last?.content.count, GatewayRequestPolicy.maximumConversationMessageCharacters)
+        XCTAssertNoThrow(try GatewayAskRequest(question: "继续", webSearch: false, history: history))
+    }
+
     func testUnsentDraftSurvivesArchiveRoundTripWithoutBecomingAMessage() throws {
         let conversation = AIConversation(draft: "这道题我还没有写完\n下一行 👋")
         let archive = AIConversationArchive(
@@ -703,5 +725,50 @@ final class AIConversationTests: XCTestCase {
                 ])
             )
         ]
+    }
+}
+
+extension AIConversationTests {
+    func testAnswerFooterUsesSavedRequestOptionsAndNormalizesHistoricalLabels() throws {
+        var message = AIConversationMessage(role: .assistant, text: "回答",
+            answerBasis: "DeepSeek V4 Pro 官方 API · Cloudflare 免费转发 · 深度思考 · DeepSeek 联网搜索")
+        XCTAssertEqual(message.answerFooter, "DeepSeek V4 Pro · 深度思考 · 联网搜索")
+        message.answerOptions = AIAnswerOptions(modelIdentifier: "deepseek-v4-flash",
+            deepThinking: false, webSearch: true)
+        let restored = try JSONDecoder().decode(AIConversationMessage.self, from: JSONEncoder().encode(message))
+        XCTAssertEqual(restored.answerFooter, "DeepSeek V4 Flash · 联网搜索")
+        XCTAssertEqual(AIAnswerOptions(modelIdentifier: "deepseek-v4-pro", deepThinking: false, webSearch: false).footer,
+                       "DeepSeek V4 Pro")
+    }
+}
+
+extension AIConversationTests {
+    func testGeneratedTitlePersistsAndManualRenameWins() throws {
+        let first = AIConversationMessage(role: .user, text: "你好")
+        let topic = AIConversationMessage(role: .user, text: "请解释为什么抛物线上的点到焦点和准线距离相等")
+        var conversation = AIConversation()
+        conversation.append(first)
+        conversation.append(topic)
+        XCTAssertEqual(conversation.topicQuestion?.id, topic.id)
+        XCTAssertTrue(conversation.applyGeneratedTitle("「抛物线的焦点与准线」", for: topic))
+        conversation.append(AIConversationMessage(role: .user, text: "能再举一个例子吗"))
+        let data = try JSONEncoder().encode(conversation)
+        var restored = try JSONDecoder().decode(AIConversation.self, from: data)
+        XCTAssertFalse(restored.refreshAutomaticTitle())
+        XCTAssertEqual(restored.title, "抛物线的焦点与准线")
+        XCTAssertTrue(restored.rename(to: "解析几何"))
+        XCTAssertFalse(restored.applyGeneratedTitle("旧请求返回的主题", for: topic))
+        XCTAssertEqual(restored.title, "解析几何")
+    }
+
+    func testEditingTopicRejectsStaleTitleFromOriginalQuestion() {
+        var conversation = AIConversation()
+        let topic = AIConversationMessage(role: .user, text: "介绍一下抛物线")
+        conversation.append(topic)
+        XCTAssertTrue(conversation.applyGeneratedTitle("抛物线方程", for: topic))
+        XCTAssertTrue(conversation.replaceUserMessageAndTruncate(id: topic.id, with: "解释椭圆定义"))
+        XCTAssertNil(conversation.generatedTitleQuestionID)
+        XCTAssertEqual(conversation.title, "椭圆定义")
+        XCTAssertFalse(conversation.applyGeneratedTitle("旧抛物线主题", for: topic))
     }
 }

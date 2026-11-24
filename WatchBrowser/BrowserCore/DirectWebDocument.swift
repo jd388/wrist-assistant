@@ -60,7 +60,8 @@ public enum DirectWebDocumentParser {
         data: Data,
         responseURL: URL,
         mimeType: String?,
-        textEncodingName: String? = nil
+        textEncodingName: String? = nil,
+        isPartial: Bool = false
     ) throws -> DirectWebDocument {
         let contentType = normalizedContentType(mimeType)
         if let contentType,
@@ -70,7 +71,9 @@ public enum DirectWebDocumentParser {
             throw DirectWebDocumentError.unsupportedContentType(contentType)
         }
 
-        guard var source = decodedString(data, declaredEncoding: textEncodingName) else {
+        guard var source = decodedString(
+            data, declaredEncoding: textEncodingName, allowIncompleteTail: isPartial
+        ) else {
             throw DirectWebDocumentError.invalidUTF8
         }
 
@@ -80,7 +83,7 @@ public enum DirectWebDocumentParser {
 
         let shouldParseAsXML = contentType.map(isXML) ?? looksLikeRSS(source)
         if shouldParseAsXML, looksLikeRSS(source) {
-            return try parseRSS(source, responseURL: responseURL)
+            return try parseRSS(source, responseURL: responseURL, isPartial: isPartial)
         }
 
         let shouldParseAsHTML = contentType.map(isHTML) ?? looksLikeHTML(source)
@@ -96,27 +99,42 @@ public enum DirectWebDocumentParser {
                 text: text,
                 links: [],
                 isLikelyDynamic: false,
-                wasTruncated: limited.wasTruncated
+                wasTruncated: isPartial || limited.wasTruncated
             )
         }
 
-        return try parseHTML(source, responseURL: responseURL)
+        return try parseHTML(source, responseURL: responseURL, isPartial: isPartial)
     }
 }
 
 private extension DirectWebDocumentParser {
-    static func parseHTML(_ source: String, responseURL: URL) throws -> DirectWebDocument {
-        let withoutComments = replacingMatches(
-            in: source,
-            pattern: #"(?is)<!--.*?-->"#,
-            with: ""
-        )
-        let withoutExecutableContent = ["script", "style", "noscript"].reduce(withoutComments) {
-            removingElement(named: $1, from: $0)
+    static func parseHTML(
+        _ source: String, responseURL: URL, isPartial: Bool
+    ) throws -> DirectWebDocument {
+        // At a download boundary an HTML element or comment may still be open.
+        // Drop unfinished markup and non-visible content before rendering the prefix.
+        let withoutExecutableContent: String
+        if isPartial {
+            withoutExecutableContent = replacingMatches(
+                in: source,
+                pattern: #"(?is)<!--.*?(?:-->|\z)|<(script|style|noscript|template)\b[^>]*>.*?(?:</\1\s*>|\z)|</?[a-z][^<>]*\z"#,
+                with: ""
+            )
+        } else {
+            let withoutComments = replacingMatches(
+                in: source,
+                pattern: #"(?is)<!--.*?-->"#,
+                with: ""
+            )
+            withoutExecutableContent = ["script", "style", "noscript"].reduce(withoutComments) {
+                removingElement(named: $1, from: $0)
+            }
         }
 
         if isSogouSearchURL(responseURL) {
-            return try parseSogouSearch(withoutExecutableContent, responseURL: responseURL)
+            return try parseSogouSearch(
+                withoutExecutableContent, responseURL: responseURL, isPartial: isPartial
+            )
         }
 
         let title = firstCapture(
@@ -127,10 +145,13 @@ private extension DirectWebDocumentParser {
         .flatMap { $0.isEmpty ? nil : $0 }
         ?? fallbackTitle(for: responseURL)
 
+        let bodyPattern = isPartial
+            ? #"(?is)<body\b[^>]*>(.*?)(?:</body\s*>|\z)"#
+            : #"(?is)<body\b[^>]*>(.*?)</body\s*>"#
         let bodySource = firstCapture(
             in: withoutExecutableContent,
-            pattern: #"(?is)<body\b[^>]*>(.*?)</body\s*>"#
-        ) ?? removingElement(named: "head", from: withoutExecutableContent)
+            pattern: bodyPattern
+        ) ?? removingElement(named: "head", from: withoutExecutableContent, toEnd: isPartial)
 
         let links = extractLinks(from: bodySource, responseURL: responseURL)
         let visible = visibleText(fromHTML: bodySource)
@@ -146,11 +167,13 @@ private extension DirectWebDocumentParser {
             text: text,
             links: links,
             isLikelyDynamic: likelyRequiresJavaScript(source: source, visibleText: text),
-            wasTruncated: limited.wasTruncated
+            wasTruncated: isPartial || limited.wasTruncated
         )
     }
 
-    static func decodedString(_ data: Data, declaredEncoding: String?) -> String? {
+    static func decodedString(
+        _ data: Data, declaredEncoding: String?, allowIncompleteTail: Bool
+    ) -> String? {
         var encodings: [String.Encoding] = []
         if let declaredEncoding, let encoding = encoding(named: declaredEncoding) {
             encodings.append(encoding)
@@ -170,6 +193,13 @@ private extension DirectWebDocumentParser {
         for encoding in encodings where seen.insert(encoding.rawValue).inserted {
             if let value = String(data: data, encoding: encoding) {
                 return value
+            }
+            if allowIncompleteTail, data.count > 3 {
+                for count in 1...3 {
+                    if let value = String(data: data.dropLast(count), encoding: encoding) {
+                        return value
+                    }
+                }
             }
         }
         return nil
@@ -234,7 +264,9 @@ private extension DirectWebDocumentParser {
         return prefix.contains("<rss") && prefix.contains("<channel")
     }
 
-    static func parseRSS(_ source: String, responseURL: URL) throws -> DirectWebDocument {
+    static func parseRSS(
+        _ source: String, responseURL: URL, isPartial: Bool
+    ) throws -> DirectWebDocument {
         let channelTitle = firstCapture(
             in: source,
             pattern: #"(?is)<channel\b[^>]*>.*?<title\b[^>]*>(.*?)</title\s*>"#
@@ -288,7 +320,7 @@ private extension DirectWebDocumentParser {
             text: limited.text,
             links: links,
             isLikelyDynamic: false,
-            wasTruncated: limited.wasTruncated
+            wasTruncated: isPartial || limited.wasTruncated
         )
     }
 
@@ -315,10 +347,11 @@ private extension DirectWebDocumentParser {
         return url.absoluteString
     }
 
-    static func removingElement(named name: String, from source: String) -> String {
-        replacingMatches(
+    static func removingElement(named name: String, from source: String, toEnd: Bool = false) -> String {
+        let close = "</\(name)\\s*>"
+        return replacingMatches(
             in: source,
-            pattern: "(?is)<\(name)\\b[^>]*>.*?</\(name)\\s*>",
+            pattern: "(?is)<\(name)\\b[^>]*>.*?(?:\(close)\(toEnd ? "|\\z" : ""))",
             with: ""
         )
     }
@@ -385,7 +418,8 @@ private extension DirectWebDocumentParser {
 
     static func parseSogouSearch(
         _ html: String,
-        responseURL: URL
+        responseURL: URL,
+        isPartial: Bool
     ) throws -> DirectWebDocument {
         let links = extractLinks(
             from: html,
@@ -417,7 +451,7 @@ private extension DirectWebDocumentParser {
             text: limited.text,
             links: links,
             isLikelyDynamic: false,
-            wasTruncated: limited.wasTruncated
+            wasTruncated: isPartial || limited.wasTruncated
         )
     }
 

@@ -6,6 +6,8 @@ struct LexiWatchLookupView: View {
     @StateObject private var model = LookupViewModel()
     @State private var isShowingHistory = false
     @State private var isShowingFavorites = false
+    @State private var isShowingResult = false
+    @State private var pendingLookup: String?
     @State private var favoriteEntryPendingRemoval: DictionaryEntry?
     @FocusState private var inputFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -18,13 +20,13 @@ struct LexiWatchLookupView: View {
                 lookupContent
             }
         }
-        .sheet(isPresented: $isShowingHistory) {
-            RecentHistoryView(model: model) {
+        .sheet(isPresented: $isShowingHistory, onDismiss: lookUpPendingSelection) {
+            RecentHistoryView(model: model, select: { pendingLookup = $0 }) {
                 isShowingHistory = false
             }
         }
-        .sheet(isPresented: $isShowingFavorites) {
-            FavoritesView(model: model) {
+        .sheet(isPresented: $isShowingFavorites, onDismiss: lookUpPendingSelection) {
+            FavoritesView(model: model, select: { pendingLookup = $0 }) {
                 isShowingFavorites = false
             }
         }
@@ -55,14 +57,49 @@ struct LexiWatchLookupView: View {
     }
 
     private var lookupContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                searchField
+                historyEntry
+                favoritesEntry
+            }
+            .padding(.horizontal, 4)
+            .padding(.bottom, 12)
+        }
+        .scrollIndicators(.hidden)
+        .navigationTitle("秒查")
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(isPresented: $isShowingResult) {
+            lookupResult
+        }
+        .onChange(of: model.phase) { _, phase in
+            if phase != .idle, !isShowingResult {
+                inputFocused = false
+                isShowingResult = true
+            }
+        }
+        .onChange(of: isShowingResult) { _, isPresented in
+            if !isPresented {
+                model.editQuery()
+            }
+        }
+    }
+
+    private func lookUpPendingSelection() {
+        guard let pendingLookup else { return }
+        self.pendingLookup = nil
+        model.selectRecent(pendingLookup)
+    }
+
+    private var lookupResult: some View {
         ScrollViewReader { proxy in
+            let scrollToTop = {
+                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
+                    proxy.scrollTo("lookup-result", anchor: .top)
+                }
+            }
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    if !showsDictionaryEntry {
-                        searchField
-                        historyEntry
-                        favoritesEntry
-                    }
                     resultModule
                         .id("lookup-result")
                 }
@@ -72,16 +109,19 @@ struct LexiWatchLookupView: View {
             .scrollIndicators(.hidden)
             .onChange(of: model.phase) { _, phase in
                 guard phase != .idle else { return }
-                if reduceMotion {
-                    proxy.scrollTo("lookup-result", anchor: .top)
-                } else {
-                    withAnimation(.easeOut(duration: 0.2)) {
-                        proxy.scrollTo("lookup-result", anchor: .top)
+                scrollToTop()
+            }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(action: scrollToTop) {
+                        Image(systemName: "arrow.up")
                     }
+                    .accessibilityLabel("回到顶部")
+                    .accessibilityIdentifier("dictionary.backToTop")
                 }
             }
         }
-        .navigationTitle("秒查")
+        .navigationTitle("查词结果")
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -246,59 +286,32 @@ struct LexiWatchLookupView: View {
     }
 
     private func localResult(_ match: DictionaryMatch) -> some View {
-        let featuredExpressions = featuredExpressions(for: match.entry)
+        let meanings = orderedMeanings(for: match)
+        let opensDetails = meanings.count > 3 || !match.entry.relatedExpressions.isEmpty ||
+            meanings.contains {
+                !$0.collocations.isEmpty || !($0.collocationDetails ?? []).isEmpty ||
+                    MeaningGroup.partOfSpeechTitle($0.partOfSpeech) == "动词"
+            }
 
         return VStack(alignment: .leading, spacing: 6) {
             entryHeader(match.entry)
 
-            if match.entry.meanings.count > 3 {
-                ForEach(MeaningGroup.groups(for: match.entry.meanings)) { group in
-                    meaningGroupLink(group, headword: match.entry.headword)
+            if opensDetails {
+                ForEach(MeaningGroup.groups(for: meanings, expressions: match.entry.relatedExpressions)) { group in
+                    meaningGroupLink(group, entry: match.entry)
                 }
             } else {
-                ForEach(Array(match.entry.meanings.enumerated()), id: \.offset) { index, meaning in
+                ForEach(Array(meanings.enumerated()), id: \.offset) { index, meaning in
                     MeaningCard(
                         meaning: meaning,
-                        position: match.entry.meanings.count > 1 ? index + 1 : nil,
-                        partOfSpeech: index == 0 || meaning.partOfSpeech != match.entry.meanings[index - 1].partOfSpeech
+                        headword: match.entry.headword,
+                        position: meanings.count > 1 ? index + 1 : nil,
+                        partOfSpeech: index == 0 || meaning.partOfSpeech != meanings[index - 1].partOfSpeech
                     )
                 }
-            }
-
-            expressionSection(
-                title: "短语动词",
-                icon: "arrow.triangle.branch",
-                expressions: featuredExpressions.filter { $0.kind == .phrasalVerb }
-            )
-
-            expressionSection(
-                title: "动词句型",
-                icon: "text.line.first.and.arrowtriangle.forward",
-                expressions: featuredExpressions.filter { $0.kind == .verbPattern }
-            )
-
-            expressionSection(
-                title: "固定搭配",
-                icon: "link",
-                expressions: featuredExpressions.filter { $0.kind == .fixedPhrase }
-            )
-
-            if match.entry.relatedExpressions.count > featuredExpressions.count {
-                NavigationLink {
-                    RelatedExpressionsView(entry: match.entry)
-                } label: {
-                    Label(
-                        "查看全部 \(match.entry.relatedExpressions.count) 条表达",
-                        systemImage: "list.bullet"
-                    )
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                }
-                .buttonStyle(.bordered)
-                .accessibilityHint("在新页面按类型查看，不会丢失当前查词结果")
             }
 
             correctionSuggestions(title: "其他常用译法")
-            editButton
 
             Text(match.entry.source ?? (match.entry.priority >= 30_000 ? "扩展词库" : "离线词典"))
                 .font(.caption2)
@@ -308,29 +321,43 @@ struct LexiWatchLookupView: View {
         }
     }
 
+    private func orderedMeanings(for match: DictionaryMatch) -> [DictionaryEntry.Meaning] {
+        let meanings = match.entry.meanings
+        let query = DictionarySearchEngine.normalize(model.query)
+        guard match.kind == .exactMeaning, DictionarySearchEngine.containsChinese(query) else {
+            return meanings
+        }
+        let matching = Set(meanings.filter { DictionarySearchEngine.normalize($0.chinese).contains(query) })
+        return meanings.filter(matching.contains) + meanings.filter { !matching.contains($0) }
+    }
+
     private func entryHeader(_ entry: DictionaryEntry) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
+        let primaryPartOfSpeech = entry.regionalPronunciations.first?.partOfSpeech
+        let pronunciations = entry.regionalPronunciations.filter { $0.partOfSpeech == primaryPartOfSpeech }
+
+        return VStack(alignment: .leading, spacing: 0) {
+            DictionaryHeadword(word: entry.headword)
             HStack(alignment: .center, spacing: 4) {
-                Text(entry.headword)
-                    .font(.title2.weight(.bold))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityAddTraits(.isHeader)
+                DictionaryPronunciations(regional: pronunciations, fallback: entry.pronunciation)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 favoriteButton(for: entry)
-            }
-            if let pronunciation = entry.pronunciation, !pronunciation.isEmpty {
-                Text(pronunciation)
-                    .font(.caption2.monospaced())
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(.horizontal, 4)
     }
 
-    private func meaningGroupLink(_ group: MeaningGroup, headword: String) -> some View {
+    private func meaningGroupLink(_ group: MeaningGroup, entry: DictionaryEntry) -> some View {
         NavigationLink {
-            MeaningGroupView(headword: headword, group: group)
+            MeaningGroupView(
+                headword: entry.headword,
+                group: group,
+                meanings: entry.meanings.filter {
+                    MeaningGroup.partOfSpeechTitle($0.partOfSpeech) == group.title
+                },
+                pronunciations: entry.regionalPronunciations.filter {
+                    MeaningGroup.partOfSpeechTitle($0.partOfSpeech) == group.title
+                }
+            )
         } label: {
             HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 3) {
@@ -362,7 +389,7 @@ struct LexiWatchLookupView: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .accessibilityHint("查看该词性的完整释义和例句")
+        .accessibilityHint("查看该词性的完整释义、例句和搭配")
     }
 
     private func favoriteButton(for entry: DictionaryEntry) -> some View {
@@ -384,59 +411,6 @@ struct LexiWatchLookupView: View {
         .buttonStyle(.plain)
         .accessibilityLabel(isFavorite ? "\(entry.headword)已收藏" : "收藏\(entry.headword)到单词本")
         .accessibilityHint(isFavorite ? "轻点后确认取消收藏" : "轻点收藏，以后可从单词本快速查看")
-    }
-
-    @ViewBuilder
-    private func expressionSection(
-        title: String,
-        icon: String,
-        expressions: [DictionaryEntry.RelatedExpression]
-    ) -> some View {
-        if !expressions.isEmpty {
-            VStack(alignment: .leading, spacing: 7) {
-                Label(title, systemImage: icon)
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.tint)
-
-                ForEach(expressions) { expression in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(expression.text)
-                            .font(.body.weight(.semibold))
-                        if !expression.chinese.isEmpty {
-                            Text(expression.chinese)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        if let example = expression.example {
-                            Text(example)
-                                .font(.caption2)
-                                .italic()
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        if let exampleChinese = expression.exampleChinese {
-                            Text(exampleChinese)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                    .padding(.vertical, 2)
-                }
-            }
-            .padding(9)
-            .background(Color.accentColor.opacity(0.09), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        }
-    }
-
-    private func featuredExpressions(
-        for entry: DictionaryEntry,
-        limit: Int = 6
-    ) -> [DictionaryEntry.RelatedExpression] {
-        FeaturedExpressionPolicy.select(
-            from: entry.relatedExpressions,
-            limit: limit
-        )
     }
 
     private func translationResult(_ translation: LocalTranslation) -> some View {
@@ -465,7 +439,6 @@ struct LexiWatchLookupView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             correctionSuggestions(title: "也可能想查")
-            editButton
         }
         .padding(10)
         .background(Color.white.opacity(0.075), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -485,7 +458,7 @@ struct LexiWatchLookupView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(suggestion.entry.headword)
                                 .font(.body.weight(.semibold))
-                            Text(suggestion.entry.meanings.first?.chinese ?? "")
+                            Text(orderedMeanings(for: suggestion).first?.chinese ?? "")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
@@ -511,7 +484,6 @@ struct LexiWatchLookupView: View {
                     .frame(maxWidth: .infinity, minHeight: 44)
             }
             .buttonStyle(.borderedProminent)
-            editButton
         }
         .padding(10)
         .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -536,21 +508,9 @@ struct LexiWatchLookupView: View {
             }
             .buttonStyle(.borderedProminent)
             .accessibilityHint("跳过不可用的词典，明确使用离线模型处理原输入")
-            editButton
         }
         .padding(10)
         .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-
-    private var editButton: some View {
-        Button {
-            model.editQuery()
-            inputFocused = true
-        } label: {
-            Label("修改输入", systemImage: "pencil")
-                .frame(maxWidth: .infinity, minHeight: 44)
-        }
-        .buttonStyle(.bordered)
     }
 
     private func sourceBadge(_ title: String, systemImage: String) -> some View {
@@ -593,12 +553,73 @@ struct LexiWatchLookupView: View {
 }
 
 
+private struct DictionaryHeadword: View {
+    let word: String
+    @ScaledMetric(relativeTo: .title2) private var pointSize = 23.0
+
+    var body: some View {
+        Text(word)
+            .font(.system(size: pointSize, weight: .bold))
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityAddTraits(.isHeader)
+    }
+}
+
+private struct DictionaryPronunciations: View {
+    let regional: [DictionaryEntry.RegionalPronunciation]
+    var fallback: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            if regional.isEmpty {
+                ForEach(Array((fallback ?? "").split(separator: "·").enumerated()), id: \.offset) { _, ipa in
+                    line(ipas: [String(ipa)], region: nil)
+                }
+            } else {
+                let regions: [DictionaryEntry.RegionalPronunciation.Region?] = [.uk, .us, nil]
+                ForEach(regions, id: \.self) { region in
+                    line(ipas: regional.filter { $0.region == region }.map(\.ipa), region: region)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func line(ipas: [String], region: DictionaryEntry.RegionalPronunciation.Region?) -> some View {
+        let trim = CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "/[]"))
+        let values = ipas.reduce(into: [String]()) { readings, ipa in
+            let value = ipa.trimmingCharacters(in: trim)
+            if !value.isEmpty && !readings.contains(value) { readings.append(value) }
+        }
+        if !values.isEmpty {
+            HStack(alignment: .firstTextBaseline, spacing: 5) {
+                if let region {
+                    Text(region == .uk ? "英" : "美")
+                        .font(.caption2.weight(.semibold))
+                        .accessibilityLabel(region == .uk ? "英式音标" : "美式音标")
+                }
+                Text(values.map { "/\($0)/" }.joined(separator: " · "))
+                    .font(.caption)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
+            }
+            .foregroundStyle(.secondary)
+            .accessibilityElement(children: .combine)
+        }
+    }
+}
+
 private struct MeaningGroup: Identifiable {
     let title: String
     let meanings: [DictionaryEntry.Meaning]
+    let expressions: [DictionaryEntry.RelatedExpression]
     var id: String { title }
 
-    static func groups(for meanings: [DictionaryEntry.Meaning]) -> [Self] {
+    static func groups(
+        for meanings: [DictionaryEntry.Meaning],
+        expressions: [DictionaryEntry.RelatedExpression]
+    ) -> [Self] {
         var order: [String] = []
         var contents: [String: [DictionaryEntry.Meaning]] = [:]
         for meaning in meanings {
@@ -606,7 +627,23 @@ private struct MeaningGroup: Identifiable {
             if contents[title] == nil { order.append(title) }
             contents[title, default: []].append(meaning)
         }
-        return order.map { Self(title: $0, meanings: contents[$0, default: []]) }
+        guard let firstTitle = order.first else { return [] }
+
+        var groupedExpressions: [String: [DictionaryEntry.RelatedExpression]] = [:]
+        for expression in expressions {
+            let attributedTitle = expression.partOfSpeech.map(partOfSpeechTitle)
+            let defaultTitle = expression.kind != .fixedPhrase && contents["动词"] != nil ? "动词" : firstTitle
+            let title = attributedTitle.flatMap { contents[$0] == nil ? nil : $0 } ?? defaultTitle
+            if expression.kind == .verbPattern,
+               contents[title, default: []].contains(where: { $0.collocations.contains(expression.text) }) {
+                continue
+            }
+            groupedExpressions[title, default: []].append(expression)
+        }
+
+        return order.map {
+            Self(title: $0, meanings: contents[$0, default: []], expressions: groupedExpressions[$0, default: []])
+        }
     }
 
     static func partOfSpeechTitle(_ rawValue: String) -> String {
@@ -629,15 +666,28 @@ private struct MeaningGroup: Identifiable {
 private struct MeaningGroupView: View {
     let headword: String
     let group: MeaningGroup
+    let meanings: [DictionaryEntry.Meaning]
+    let pronunciations: [DictionaryEntry.RegionalPronunciation]
 
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 8) {
-                Text(headword)
-                    .font(.title3.weight(.bold))
-                    .accessibilityAddTraits(.isHeader)
-                ForEach(Array(group.meanings.enumerated()), id: \.offset) { index, meaning in
-                    MeaningCard(meaning: meaning, position: index + 1, partOfSpeech: false)
+                DictionaryHeadword(word: headword)
+                DictionaryPronunciations(regional: pronunciations)
+                ForEach(Array(meanings.enumerated()), id: \.offset) { index, meaning in
+                    MeaningCard(meaning: meaning, headword: headword, position: index + 1, partOfSpeech: false)
+                }
+                if !featuredExpressions.isEmpty {
+                    Text("常用固定表达")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tint)
+                        .accessibilityAddTraits(.isHeader)
+                    ForEach(Array(featuredExpressions.enumerated()), id: \.offset) { _, expression in
+                        DictionaryExpressionText(expression: expression)
+                            .padding(9)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(.white.opacity(0.075), in: RoundedRectangle(cornerRadius: 12))
+                    }
                 }
             }
             .padding(.horizontal, 4)
@@ -646,12 +696,37 @@ private struct MeaningGroupView: View {
         .navigationTitle(group.title)
         .navigationBarTitleDisplayMode(.inline)
     }
+
+    private var featuredExpressions: [DictionaryEntry.RelatedExpression] {
+        let included = Set(meanings.flatMap { ($0.collocationDetails ?? []).filter { !$0.chinese.isEmpty }.map(\.text) })
+        return FeaturedExpressionPolicy.select(
+            from: group.expressions.filter {
+                !$0.chinese.isEmpty && !included.contains($0.text) &&
+                    ($0.kind != .verbPattern || FeaturedExpressionPolicy.isUsefulUsagePattern($0.text, headword: headword))
+            },
+            limit: 3
+        )
+    }
 }
 
 private struct MeaningCard: View {
     let meaning: DictionaryEntry.Meaning
+    let headword: String
     let position: Int?
     let partOfSpeech: Bool
+
+    private var usagePatterns: [String] {
+        Array(meaning.collocations.filter { pattern in
+            FeaturedExpressionPolicy.isUsefulUsagePattern(pattern, headword: headword)
+        }.prefix(3))
+    }
+
+    private var lexicalCollocations: [DictionaryEntry.RelatedExpression] {
+        var seen = Set<String>()
+        return Array((meaning.collocationDetails ?? []).filter {
+            !$0.chinese.isEmpty && seen.insert($0.text.lowercased()).inserted
+        }.prefix(3 - usagePatterns.count))
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
@@ -675,7 +750,8 @@ private struct MeaningCard: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            if let example = meaning.example {
+            if let example = meaning.example,
+               !lexicalCollocations.contains(where: { $0.example == example }) {
                 Divider()
                 Text(example)
                     .font(.caption)
@@ -686,13 +762,16 @@ private struct MeaningCard: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            if !meaning.collocations.isEmpty {
+            if !usagePatterns.isEmpty || !lexicalCollocations.isEmpty {
                 Divider()
                 Text("搭配")
                     .font(.caption2.weight(.medium))
                     .foregroundStyle(.secondary)
-                ForEach(Array(meaning.collocations.enumerated()), id: \.offset) { _, collocation in
-                    Text(collocation).font(.caption)
+                ForEach(Array(usagePatterns.enumerated()), id: \.offset) { _, collocation in
+                    Text(collocation).font(.caption.weight(.semibold))
+                }
+                ForEach(Array(lexicalCollocations.enumerated()), id: \.offset) { _, expression in
+                    DictionaryExpressionText(expression: expression)
                 }
             }
         }
@@ -702,78 +781,37 @@ private struct MeaningCard: View {
     }
 }
 
-private struct RelatedExpressionsView: View {
-    let entry: DictionaryEntry
+private struct DictionaryExpressionText: View {
+    let expression: DictionaryEntry.RelatedExpression
 
     var body: some View {
-        List {
-            expressionSection(
-                title: "短语动词",
-                icon: "arrow.triangle.branch",
-                kind: .phrasalVerb
-            )
-            expressionSection(
-                title: "动词句型",
-                icon: "text.line.first.and.arrowtriangle.forward",
-                kind: .verbPattern
-            )
-            expressionSection(
-                title: "固定搭配",
-                icon: "link",
-                kind: .fixedPhrase
-            )
-        }
-        .listStyle(.carousel)
-        .scrollIndicators(.hidden)
-        .navigationTitle("全部表达 \(entry.relatedExpressions.count)")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-
-    @ViewBuilder
-    private func expressionSection(
-        title: String,
-        icon: String,
-        kind: DictionaryEntry.RelatedExpression.Kind
-    ) -> some View {
-        let expressions = entry.relatedExpressions.filter { $0.kind == kind }
-        if !expressions.isEmpty {
-            Section {
-                ForEach(expressions) { expression in
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(expression.text)
-                            .font(.body.weight(.semibold))
-                            .fixedSize(horizontal: false, vertical: true)
-                        if !expression.chinese.isEmpty {
-                            Text(expression.chinese)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        if let example = expression.example {
-                            Text(example)
-                                .font(.caption2)
-                                .italic()
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        if let exampleChinese = expression.exampleChinese {
-                            Text(exampleChinese)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                    .padding(.vertical, 4)
-                    .accessibilityElement(children: .combine)
-                }
-            } header: {
-                Label(title, systemImage: icon)
+        VStack(alignment: .leading, spacing: 3) {
+            Text(expression.text)
+                .font(.caption.weight(.semibold))
+            if !expression.chinese.isEmpty {
+                Text(expression.chinese)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if let example = expression.example {
+                Text(example)
+                    .font(.caption2)
+                    .italic()
+            }
+            if let translation = expression.exampleChinese {
+                Text(translation)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
         }
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .combine)
     }
 }
 
 private struct RecentHistoryView: View {
     @ObservedObject var model: LookupViewModel
+    let select: (String) -> Void
     let close: () -> Void
 
     @State private var pendingDeletion: PendingDeletion?
@@ -872,7 +910,7 @@ private struct RecentHistoryView: View {
 
     private func historyRow(_ query: String) -> some View {
         Button {
-            model.selectRecent(query)
+            select(query)
             close()
         } label: {
             HStack(alignment: .center, spacing: 7) {
@@ -938,6 +976,7 @@ private struct RecentHistoryView: View {
 
 private struct FavoritesView: View {
     @ObservedObject var model: LookupViewModel
+    let select: (String) -> Void
     let close: () -> Void
 
     @State private var favoritePendingRemoval: FavoriteWord?
@@ -1009,7 +1048,7 @@ private struct FavoritesView: View {
 
     private func favoriteRow(_ favorite: FavoriteWord) -> some View {
         Button {
-            model.selectFavorite(favorite)
+            select(favorite.headword)
             close()
         } label: {
             HStack(alignment: .center, spacing: 7) {

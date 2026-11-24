@@ -175,7 +175,7 @@ final class LookupViewModel: ObservableObject {
     }
 
     func isFavorite(_ entry: DictionaryEntry) -> Bool {
-        favorites.contains { $0.id == entry.id }
+        favorites.contains { $0.matches(entry) }
     }
 
     func toggleFavorite(_ entry: DictionaryEntry) {
@@ -184,8 +184,8 @@ final class LookupViewModel: ObservableObject {
             return
         }
 
-        if let index = favorites.firstIndex(where: { $0.id == entry.id }) {
-            favorites.remove(at: index)
+        if isFavorite(entry) {
+            favorites.removeAll { $0.matches(entry) }
             persistFavorites()
             WKInterfaceDevice.current().play(.click)
         } else {
@@ -195,11 +195,6 @@ final class LookupViewModel: ObservableObject {
             persistFavorites()
             WKInterfaceDevice.current().play(.success)
         }
-    }
-
-    func selectFavorite(_ favorite: FavoriteWord) {
-        query = favorite.headword
-        submit()
     }
 
     func removeFavorite(_ favorite: FavoriteWord) {
@@ -257,11 +252,20 @@ final class LookupViewModel: ObservableObject {
 
         phase = .searching
 
-        if let oxfordDictionary,
-           !DictionarySearchEngine.containsChinese(submittedQuery) {
-            let oxfordMatches = try? await oxfordDictionary.search(submittedQuery, suggestionLimit: 0)
+        if let oxfordDictionary {
+            let isChinese = DictionarySearchEngine.containsChinese(submittedQuery)
+            let oxfordMatches = try? await oxfordDictionary.search(
+                submittedQuery, suggestionLimit: isChinese ? 11 : 0
+            )
             guard requestGate.isCurrent(token) else { return }
-            if let match = oxfordMatches?.bestMatch {
+            if let matches = oxfordMatches, let bestMatch = matches.bestMatch {
+                let match = DictionarySearchEngine.preferredChineseHeadwords(for: submittedQuery)
+                    .lazy.compactMap { headword in
+                        matches.exactMatches.first {
+                            DictionarySearchEngine.normalize($0.entry.headword) == headword
+                        }
+                    }.first ?? bestMatch
+                suggestions = Array(matches.exactMatches.filter { $0.id != match.id }.prefix(4))
                 phase = .local(match)
                 remember(submittedQuery)
                 WKInterfaceDevice.current().play(.success)
@@ -324,6 +328,18 @@ final class LookupViewModel: ObservableObject {
             WKInterfaceDevice.current().play(.success)
             return
         }
+
+        if let spelling = UnifiedLookupPolicy.joinedEnglishSpellingCandidate(for: submittedQuery),
+           let match = await lookupJoinedSpelling(spelling, in: engine) {
+            guard requestGate.isCurrent(token) else { return }
+            suggestions = []
+            phase = .local(match)
+            remember(submittedQuery)
+            WKInterfaceDevice.current().play(.success)
+            return
+        }
+        guard requestGate.isCurrent(token) else { return }
+
         if !extended.suggestions.isEmpty {
             var seen = Set(suggestions.map(\.entry.id))
             suggestions.append(contentsOf: extended.suggestions.filter {
@@ -333,6 +349,24 @@ final class LookupViewModel: ObservableObject {
         }
 
         await performTranslation(submittedQuery, token: token)
+    }
+
+    private func lookupJoinedSpelling(
+        _ spelling: String,
+        in engine: DictionarySearchEngine
+    ) async -> DictionaryMatch? {
+        if let oxfordDictionary,
+           let match = try? await oxfordDictionary.search(spelling, suggestionLimit: 0).bestMatch {
+            return match
+        }
+        guard let core = await searchCore(engine, query: spelling) else { return nil }
+        if !UnifiedLookupPolicy.shouldConsultExtendedDictionary(after: core) {
+            return core.bestMatch
+        }
+        guard let extended = try? await extendedDictionary.search(spelling, suggestionLimit: 0) else {
+            return core.bestMatch
+        }
+        return UnifiedLookupPolicy.preferredDictionaryMatch(core: core, extended: extended)
     }
 
     private func readySearchEngine() async throws -> DictionarySearchEngine {

@@ -4,8 +4,8 @@ public enum AIConversationPolicy {
     public static let archiveVersion = 1
     public static let maximumConversations = 20
     public static let maximumMessagesPerConversation = 40
-    public static let maximumStoredCharacters = 120_000
-    public static let maximumStoredBytes = 512 * 1_024
+    public static let maximumStoredCharacters = 240_000
+    public static let maximumStoredBytes = 1_024 * 1_024
     public static let maximumStoredResponseItemsBytes = 256 * 1_024
     public static let maximumTitleCharacters = 36
     public static let maximumTitleBytes = 256
@@ -15,6 +15,34 @@ public enum AIConversationMessageStatus: String, Codable, Equatable, Sendable {
     case pending
     case completed
     case interrupted
+}
+
+public struct AIAnswerOptions: Codable, Equatable, Sendable {
+    public var modelIdentifier: String
+    public let deepThinking: Bool
+    public let webSearch: Bool
+
+    public init(modelIdentifier: String, deepThinking: Bool, webSearch: Bool) {
+        self.modelIdentifier = modelIdentifier
+        self.deepThinking = deepThinking
+        self.webSearch = webSearch
+    }
+
+    public var footer: String {
+        let identifier = modelIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !identifier.isEmpty else { return "" }
+        let model: String
+        switch identifier.lowercased() {
+        case "deepseek-v4-pro", "deepseek v4 pro": model = "DeepSeek V4 Pro"
+        case "deepseek-v4-flash", "deepseek-flash", "deepseek v4 flash", "deepseek flash":
+            model = "DeepSeek V4 Flash"
+        default: model = identifier
+        }
+        var parts = [model]
+        if deepThinking { parts.append("深度思考") }
+        if webSearch { parts.append("联网搜索") }
+        return parts.joined(separator: " · ")
+    }
 }
 
 public struct AIConversationMessage: Codable, Equatable, Identifiable, Sendable {
@@ -28,6 +56,23 @@ public struct AIConversationMessage: Codable, Equatable, Identifiable, Sendable 
     public var wasTruncated: Bool
     public var status: AIConversationMessageStatus
     public var responseItems: [GatewayResponseItem]?
+    public var responseModel: DeepSeekModel?
+    public var answerOptions: AIAnswerOptions?
+
+    public var answerFooter: String {
+        if let answerOptions { return answerOptions.footer }
+        let oldParts = answerBasis.components(separatedBy: " · ")
+        let oldModel = (oldParts.first ?? "")
+            .replacingOccurrences(of: " 官方 API", with: "")
+            .replacingOccurrences(of: "（旧回答）", with: "")
+        let identifier = responseModel?.rawValue ?? (oldModel == "回答已中断" ? "" : oldModel)
+        let searchLabels: Set<String> = ["联网搜索", "DeepSeek 联网搜索", "Wikimedia 开放资料", "在线资料检索"]
+        return AIAnswerOptions(
+            modelIdentifier: identifier,
+            deepThinking: oldParts.contains("深度思考"),
+            webSearch: oldParts.contains(where: searchLabels.contains)
+        ).footer
+    }
 
     private enum CodingKeys: String, CodingKey {
         case id
@@ -40,6 +85,8 @@ public struct AIConversationMessage: Codable, Equatable, Identifiable, Sendable 
         case wasTruncated
         case status
         case responseItems
+        case responseModel
+        case answerOptions
     }
 
     public init(
@@ -66,6 +113,8 @@ public struct AIConversationMessage: Codable, Equatable, Identifiable, Sendable 
         self.responseItems = role == .assistant
             ? responseItems.flatMap { try? GatewayResponseItemsPolicy.validated($0) }
             : nil
+        responseModel = nil
+        answerOptions = nil
     }
 
     public init(from decoder: Decoder) throws {
@@ -94,6 +143,10 @@ public struct AIConversationMessage: Codable, Equatable, Identifiable, Sendable 
                 return try? GatewayResponseItemsPolicy.validated(items)
             }
             : nil
+        responseModel = role == .assistant
+            ? try values.decodeIfPresent(String.self, forKey: .responseModel).flatMap(DeepSeekModel.init(rawValue:))
+            : nil
+        answerOptions = role == .assistant ? try values.decodeIfPresent(AIAnswerOptions.self, forKey: .answerOptions) : nil
     }
 }
 
@@ -101,6 +154,7 @@ public struct AIConversation: Codable, Equatable, Identifiable, Sendable {
     public let id: UUID
     public private(set) var title: String
     public private(set) var titleIsAutomatic: Bool
+    public private(set) var generatedTitleQuestionID: UUID?
     public let createdAt: Date
     public var updatedAt: Date
     public var messages: [AIConversationMessage]
@@ -112,6 +166,7 @@ public struct AIConversation: Codable, Equatable, Identifiable, Sendable {
         case id
         case title
         case titleIsAutomatic
+        case generatedTitleQuestionID
         case createdAt
         case updatedAt
         case messages
@@ -150,6 +205,7 @@ public struct AIConversation: Codable, Equatable, Identifiable, Sendable {
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         id = try values.decode(UUID.self, forKey: .id)
+        generatedTitleQuestionID = try values.decodeIfPresent(UUID.self, forKey: .generatedTitleQuestionID)
         let decodedTitle = try values.decode(String.self, forKey: .title)
         // Archives written before manual rename existed contain only automatic
         // titles, so treating a missing flag as automatic preserves their behavior.
@@ -206,6 +262,7 @@ public struct AIConversation: Codable, Equatable, Identifiable, Sendable {
         guard let normalized = Self.normalizedTitle(from: rawTitle) else { return false }
         title = normalized
         titleIsAutomatic = false
+        generatedTitleQuestionID = nil
         updatedAt = now
         return true
     }
@@ -225,6 +282,9 @@ public struct AIConversation: Codable, Equatable, Identifiable, Sendable {
               normalized.utf8.count <= GatewayRequestPolicy.maximumQuestionBytes,
               let index = messages.firstIndex(where: { $0.id == id && $0.role == .user }) else {
             return false
+        }
+        if generatedTitleQuestionID == id {
+            generatedTitleQuestionID = nil
         }
         messages[index].text = normalized
         if messages.index(after: index) < messages.endIndex {
@@ -262,7 +322,10 @@ public struct AIConversation: Codable, Equatable, Identifiable, Sendable {
         updatedAt = now
     }
 
-    public func requestHistory(excludingMessageID: UUID? = nil) -> [GatewayChatMessage] {
+    public func requestHistory(
+        excludingMessageID: UUID? = nil,
+        replayingResponseItemsFor model: DeepSeekModel? = nil
+    ) -> [GatewayChatMessage] {
         var completedTurns: [(user: GatewayChatMessage, assistant: GatewayChatMessage)] = []
         var index = messages.startIndex
         while index < messages.endIndex {
@@ -279,12 +342,18 @@ public struct AIConversation: Codable, Equatable, Identifiable, Sendable {
                   let user = try? GatewayChatMessage(
                       role: .user,
                       content: userMessage.text
-                  ),
-                  let assistant = try? GatewayChatMessage(
-                      role: .assistant,
-                      content: assistantMessage.text,
-                      responseItems: assistantMessage.responseItems
                   ) else {
+                index = assistantIndex
+                continue
+            }
+            let assistantText = Self.boundedHistoryText(assistantMessage.text)
+            let canReplayItems = assistantText == assistantMessage.text
+                && (model == nil || assistantMessage.responseModel == model)
+            guard let assistant = try? GatewayChatMessage(
+                role: .assistant,
+                content: assistantText,
+                responseItems: canReplayItems ? assistantMessage.responseItems : nil
+            ) else {
                 index = assistantIndex
                 continue
             }
@@ -323,6 +392,22 @@ public struct AIConversation: Codable, Equatable, Identifiable, Sendable {
             remainingResponseItemsBytes -= responseItemsByteCost
         }
         return reversedTurns.reversed().flatMap { [$0.user, $0.assistant] }
+    }
+
+    private static func boundedHistoryText(_ text: String) -> String {
+        let characterLimit = GatewayRequestPolicy.maximumConversationMessageCharacters
+        let byteLimit = GatewayRequestPolicy.maximumConversationMessageBytes
+        guard text.count > characterLimit || text.utf8.count > byteLimit else { return text }
+
+        var bounded = ""
+        var remainingBytes = byteLimit
+        for character in text.prefix(characterLimit) {
+            let bytes = String(character).utf8.count
+            guard bytes <= remainingBytes else { break }
+            bounded.append(character)
+            remainingBytes -= bytes
+        }
+        return bounded
     }
 
     public static func makeTitle(from text: String) -> String {
@@ -377,21 +462,39 @@ public struct AIConversation: Codable, Equatable, Identifiable, Sendable {
         return normalizedTitle(from: title) ?? "新对话"
     }
 
-    /// Local topic extraction; never overwrites a title explicitly chosen by the user.
-    @discardableResult
-    public mutating func refreshAutomaticTitle() -> Bool {
-        guard titleIsAutomatic else { return false }
+    public var topicQuestion: AIConversationMessage? {
         let questions = messages.filter { $0.role == .user && !$0.text.isEmpty }
         let greetings: Set<String> = ["你好", "您好", "hi", "hello", "在吗", "早上好", "晚上好"]
-        let question = questions.first {
+        return questions.first {
             let text = $0.text.trimmingCharacters(in: .whitespacesAndNewlines)
                 .trimmingCharacters(in: .punctuationCharacters).lowercased()
             return !greetings.contains(text)
-        } ?? questions.first
-        guard let question else { return false }
+        }
+    }
+
+    @discardableResult
+    public mutating func refreshAutomaticTitle() -> Bool {
+        guard titleIsAutomatic, generatedTitleQuestionID == nil,
+              let question = topicQuestion ?? messages.first(where: { $0.role == .user }) else { return false }
         let updated = Self.makeTitle(from: question.text)
         guard title != updated else { return false }
         title = updated
+        return true
+    }
+
+    @discardableResult
+    public mutating func applyGeneratedTitle(_ response: String, for question: AIConversationMessage) -> Bool {
+        let lines = response.split(whereSeparator: \.isNewline)
+        guard titleIsAutomatic, let current = topicQuestion,
+              current.id == question.id, current.text == question.text,
+              lines.count == 1, let line = lines.first else { return false }
+        let trimmed = String(line).trimmingCharacters(
+            in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "#*\"'“”「」《》"))
+        )
+        guard trimmed.count <= AIConversationPolicy.maximumTitleCharacters,
+              !trimmed.contains("://"), let normalized = Self.normalizedTitle(from: trimmed) else { return false }
+        title = normalized
+        generatedTitleQuestionID = question.id
         return true
     }
 

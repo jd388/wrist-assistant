@@ -1,10 +1,16 @@
 import SwiftUI
 import UIKit
+import WidgetKit
 
 struct ContentView: View {
     @AppStorage("remoteBrowserAddress") private var address = ""
     @AppStorage("browserAddressMigrationVersion") private var addressMigrationVersion = 0
     @AppStorage("rendererServerURL") private var serverURL = BrowserServerDefaults.baseURL
+    @AppStorage(AIReplyPreferenceKey.model) private var replyModel = AIReplyModelSelection.automatic
+    @AppStorage(AIReplyPreferenceKey.deepThinking) private var replyDeepThinking = false
+    @AppStorage(AIReplyPreferenceKey.webSearch) private var replyWebSearch = false
+    @AppStorage(AIReplyPreferenceKey.showReasoning) private var showReasoning = true
+    @AppStorage(AIReplyPreferenceKey.showSources) private var showSources = true
     @State private var accessToken = ""
     @StateObject private var browser = WatchRemoteBrowser()
     @Environment(\.openURL) private var openURL
@@ -13,6 +19,27 @@ struct ContentView: View {
     @State private var directReaderURL: URL?
     @State private var showingDirectReader = false
     @State private var gatewayTokenError: String?
+    @State private var homePath = HomePage.launchPath
+    @State private var didSeedWidgetActivity = false
+
+    private enum HomePage: Hashable {
+        case dictionary
+        case ai
+        case settings
+
+        static var launchPath: [Self] {
+            #if DEBUG
+            let arguments = ProcessInfo.processInfo.arguments
+            if arguments.contains("--wrist-ui-open-dictionary") { return [.dictionary] }
+            if arguments.contains("--wrist-ui-open-chat")
+                || arguments.contains("--wrist-ui-open-editor")
+                || arguments.contains("--wrist-ui-open-history") {
+                return [.ai]
+            }
+            #endif
+            return []
+        }
+    }
 
     private enum BrowserInputAction {
         case safari
@@ -21,18 +48,113 @@ struct ContentView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            AIChatView(
-                serverURL: $serverURL,
-                accessToken: $accessToken
-            )
+        NavigationStack(path: $homePath) {
+            List {
+                NavigationLink(value: HomePage.dictionary) {
+                    Label("词典", systemImage: "character.book.closed")
+                }
+                .accessibilityIdentifier("dictionary.open")
+
+                NavigationLink(value: HomePage.ai) {
+                    Label("AI", systemImage: "sparkles")
+                }
+
+                NavigationLink(value: HomePage.settings) {
+                    Label("设置", systemImage: "gearshape")
+                }
+            }
+            .navigationTitle("腕上助手")
+            .navigationDestination(for: HomePage.self) { page in
+                switch page {
+                case .dictionary:
+                    LexiWatchLookupView(ownsNavigationStack: false)
+                case .ai:
+                    AIChatView(
+                        serverURL: $serverURL,
+                        accessToken: $accessToken
+                    )
+                case .settings:
+                    settings
+                }
+            }
+        }
+        .onOpenURL { url in
+            guard url.scheme?.lowercased() == "wristassistant" else { return }
+            switch url.host {
+            case "home":
+                homePath.removeAll()
+                #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("--wrist-widget-qa") {
+                    print("WRIST_WIDGET opened home")
+                }
+                #endif
+            case "dictionary": homePath = [.dictionary]
+            case "ai": homePath = [.ai]
+            default: break
+            }
         }
         .onAppear {
             // This fixed Workers Free endpoint serves page-reading compatibility and,
             // only when the Watch has no local DeepSeek key, the DeepSeek proxy fallback.
             serverURL = BrowserServerDefaults.freeReaderBaseURL
             loadGatewayToken()
+            AssistantActivityPublisher.publishDictionary()
+            if !didSeedWidgetActivity {
+                didSeedWidgetActivity = true
+                let archive = try? AIConversationStore().load()
+                AssistantActivityPublisher.publishAI(archive?.conversations ?? [])
+                #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("--wrist-widget-storage-qa") {
+                    print("WRIST_WIDGET shared storage \(AssistantActivitySnapshot.testSharedStorage())")
+                }
+                #endif
+            }
         }
+        .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+            .receive(on: RunLoop.main)) { _ in
+            AssistantActivityPublisher.publishDictionary()
+        }
+    }
+
+    private var settings: some View {
+        List {
+            NavigationLink {
+                aiSettings
+            } label: {
+                Label("AI 设置", systemImage: "sparkles")
+            }
+            NavigationLink {
+                DictionarySettingsView()
+            } label: {
+                Label("词典设置", systemImage: "character.book.closed")
+            }
+            Section("关于") {
+                LabeledContent("版本", value: appVersionLabel)
+            }
+        }
+        .navigationTitle("设置")
+    }
+
+    private var aiSettings: some View {
+        List {
+            Section {
+                Picker("回答模型", selection: $replyModel) {
+                    ForEach(AIReplyModelSelection.allCases, id: \.self) { model in
+                        Text(model.title)
+                    }
+                }
+                .pickerStyle(.navigationLink)
+                Toggle("深度思考", isOn: $replyDeepThinking)
+                Toggle("联网搜索", isOn: $replyWebSearch)
+            } header: {
+                Text("AI 回答")
+            }
+            Section("对话显示") {
+                Toggle("显示思考过程", isOn: $showReasoning)
+                Toggle("显示搜索来源", isOn: $showSources)
+            }
+        }
+        .navigationTitle("AI 设置")
     }
 
     private var startView: some View {
@@ -637,4 +759,62 @@ private struct WebTextInputView: View {
 
 #Preview {
     ContentView()
+}
+
+private struct DictionarySettingsView: View {
+    @AppStorage(LocalTranslationProfile.preferenceKey) private var selection = LocalTranslationProfile.standard
+    private var available: [LocalTranslationProfile] { LocalTranslationProfile.available() }
+
+    var body: some View {
+        List {
+            Section("离线翻译模型") {
+                if available.count == 1 {
+                    Text(LocalTranslationProfile.standard.title)
+                } else {
+                    Picker("英译中模型", selection: $selection) {
+                        ForEach(available, id: \.self) { profile in
+                            Text(profile.title).tag(profile)
+                        }
+                    }
+                    .pickerStyle(.navigationLink)
+                }
+            }
+        }
+        .navigationTitle("词典设置")
+        .onAppear {
+            if !available.contains(selection) { selection = .standard }
+        }
+    }
+}
+
+@MainActor
+enum AssistantActivityPublisher {
+    static func publishDictionary() {
+        let defaults = UserDefaults.standard
+        let favorite = defaults.data(forKey: "favoriteWords.v1")
+            .flatMap { try? JSONDecoder().decode([FavoriteWord].self, from: $0) }?
+            .first?.headword
+        let lookup = defaults.stringArray(forKey: "recentQueries")?.first
+        update { entry in
+            entry.favorite = AssistantActivitySnapshot.preview(favorite)
+            entry.lookup = AssistantActivitySnapshot.preview(lookup)
+        }
+    }
+
+    static func publishAI(_ conversations: [AIConversation]) {
+        let newest = conversations.lazy.flatMap(\.messages)
+            .filter { $0.role == .user && !$0.text.isEmpty }
+            .max { $0.createdAt < $1.createdAt }
+        update { entry in
+            entry.question = AssistantActivitySnapshot.preview(newest?.text)
+        }
+    }
+
+    private static func update(_ mutation: (inout AssistantActivitySnapshot) -> Void) {
+        let previous = AssistantActivitySnapshot.read()
+        var next = previous
+        mutation(&next)
+        guard next != previous, (try? next.save()) != nil else { return }
+        WidgetCenter.shared.reloadTimelines(ofKind: AssistantActivitySnapshot.widgetKind)
+    }
 }

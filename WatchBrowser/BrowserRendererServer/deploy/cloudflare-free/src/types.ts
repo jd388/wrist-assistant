@@ -121,6 +121,7 @@ export interface AskRequest {
   deep_thinking: boolean;
   history: AskHistoryMessage[];
   page: AskPageContext | null;
+  generate_title?: boolean;
 }
 
 export interface Citation {
@@ -140,6 +141,7 @@ export interface AskResponse {
   page_context_used: boolean;
   truncated: boolean;
   response_items?: DeepSeekResponseItem[];
+  conversation_title?: string;
 }
 
 export type AskStreamEvent =

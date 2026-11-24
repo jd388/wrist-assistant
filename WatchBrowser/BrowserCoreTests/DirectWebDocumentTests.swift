@@ -3,6 +3,45 @@ import XCTest
 @testable import BrowserCore
 
 final class DirectWebDocumentTests: XCTestCase {
+    func testPartialHTMLKeepsBodyAndLinksWithoutOpenScriptOrComment() throws {
+        let url = try XCTUnwrap(URL(string: "https://example.com/article"))
+        let prefix = "<html><head><title>文章</title></head><body><p>已经读到的正文</p>"
+            + "<a href='/more'>延伸阅读</a>"
+        for tail in ["<script>let message = '内部文本';", "<!--内部文本", "<aside data-note='内部文本"] {
+            let document = try DirectWebDocumentParser.parse(
+                data: Data((prefix + tail).utf8), responseURL: url,
+                mimeType: "text/html", isPartial: true
+            )
+            XCTAssertEqual(document.title, "文章")
+            XCTAssertTrue(document.text.contains("已经读到的正文"))
+            XCTAssertFalse(document.text.contains("内部文本"))
+            XCTAssertEqual(document.links.map(\.url.path), ["/more"])
+            XCTAssertTrue(document.wasTruncated)
+        }
+    }
+
+    func testPartialUTF8DropsAnIncompleteTrailingCharacter() throws {
+        let url = try XCTUnwrap(URL(string: "https://example.com/article.txt"))
+        let text = "完整的前半段"
+        let data = Data(text.utf8) + Data("文".utf8.prefix(2))
+        let document = try DirectWebDocumentParser.parse(
+            data: data, responseURL: url, mimeType: "text/plain",
+            textEncodingName: "utf-8", isPartial: true
+        )
+        XCTAssertEqual(document.text, text)
+        XCTAssertTrue(document.wasTruncated)
+    }
+
+    func testPartialHeadDoesNotBecomeArticleText() throws {
+        let url = try XCTUnwrap(URL(string: "https://example.com/article"))
+        let data = Data("<html><head><title>站点标题</title><script>window.state = '".utf8)
+        XCTAssertThrowsError(try DirectWebDocumentParser.parse(
+            data: data, responseURL: url, mimeType: "text/html", isPartial: true
+        )) { error in
+            XCTAssertEqual(error as? DirectWebDocumentError, .emptyBody)
+        }
+    }
+
     func testParsesTitleReadableBodyAndRelativeLinks() throws {
         let html = Data(
             """

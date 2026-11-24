@@ -12,6 +12,10 @@ struct WatchBrowserApp: App {
 
     init() {
         #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--wrist-reading-qa") {
+            acceptanceGatewayOverride = nil
+            return
+        }
         let debugGatewayOverride = Self.takeAcceptanceGatewayOverrideIfPresent()
         let debugDeepSeekOverride = Self.takeAcceptanceDeepSeekOverrideIfPresent()
         acceptanceGatewayOverride = debugGatewayOverride
@@ -39,7 +43,9 @@ struct WatchBrowserApp: App {
     var body: some Scene {
         WindowGroup {
             #if DEBUG
-            if let parameters = visualQAParameters(
+            if ProcessInfo.processInfo.arguments.contains("--wrist-reading-qa") {
+                AIReadingAcceptanceView()
+            } else if let parameters = visualQAParameters(
                 gatewayOverride: acceptanceGatewayOverride
             ) {
                 AcceptanceVisualView(parameters: parameters)

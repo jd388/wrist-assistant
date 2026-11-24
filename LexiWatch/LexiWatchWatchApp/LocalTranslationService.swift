@@ -1,4 +1,5 @@
 import CoreML
+import Darwin
 import Foundation
 
 // Core ML's async API is available on watchOS but its Objective-C model class
@@ -95,6 +96,56 @@ enum LocalTranslationError: LocalizedError, Equatable, Sendable {
     }
 }
 
+enum LocalTranslationProfile: String, CaseIterable {
+    case standard
+    case quickMT
+
+    static let preferenceKey = "dictionaryTranslationProfile"
+
+    var title: String {
+        switch self {
+        case .standard: "轻量 · 约 7800 万参数"
+        case .quickMT: "进阶 · 约 2 亿参数"
+        }
+    }
+
+    private struct Validation: Decodable {
+        let machine: String
+        let watchOS: String
+        let computeUnits: String
+    }
+
+    static func available(in bundle: Bundle = .main) -> [Self] {
+        var profiles: [Self] = [.standard]
+        if quickMTValidation(in: bundle) != nil,
+           bundle.url(forResource: "QuickMTEncoder", withExtension: "mlmodelc") != nil,
+           bundle.url(forResource: "QuickMTDecoder", withExtension: "mlmodelc") != nil,
+           bundle.url(forResource: "QuickMTSource", withExtension: "spmlex") != nil,
+           bundle.url(forResource: "QuickMTTarget", withExtension: "spmlex") != nil {
+            profiles.append(.quickMT)
+        }
+        return profiles
+    }
+
+    private static func quickMTValidation(in bundle: Bundle) -> Validation? {
+        guard let url = bundle.url(forResource: "QuickMTValidation", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let values = try? JSONDecoder().decode([Validation].self, from: data) else { return nil }
+        var system = utsname()
+        guard uname(&system) == 0 else { return nil }
+        let machine = withUnsafeBytes(of: &system.machine) {
+            String(decoding: $0.prefix { $0 != 0 }, as: UTF8.self)
+        }
+        let os = ProcessInfo.processInfo.operatingSystemVersion
+        let version = "\(os.majorVersion).\(os.minorVersion).\(os.patchVersion)"
+        return values.first { $0.machine == machine && $0.watchOS == version }
+    }
+
+    static func quickMTComputeUnits(in bundle: Bundle) -> MLComputeUnits {
+        quickMTValidation(in: bundle)?.computeUnits == "cpuAndNeuralEngine" ? .cpuAndNeuralEngine : .cpuOnly
+    }
+}
+
 /// Runs both translation directions entirely inside the Watch app.
 ///
 /// Only one encoder/decoder pair is retained at a time so switching direction
@@ -104,13 +155,16 @@ actor LocalTranslationService {
         let encoder: String
         let decoder: String
         let tokenizer: String
+        var targetTokenizer: String? = nil
     }
 
     private struct LoadedModels {
         let direction: LocalTranslation.Direction
+        let profile: LocalTranslationProfile
         let encoder: MLModel
         let decoder: MLModel
         let tokenizer: SentencePieceTokenizer
+        let targetTokenizer: SentencePieceTokenizer
     }
 
     private static let maximumTokens = 32
@@ -141,7 +195,23 @@ actor LocalTranslationService {
         let direction: LocalTranslation.Direction = DictionarySearchEngine.containsChinese(trimmed)
             ? .chineseToEnglish
             : .englishToChinese
-        let models = try await models(for: direction)
+        let preferred = UserDefaults.standard.string(forKey: LocalTranslationProfile.preferenceKey)
+            .flatMap(LocalTranslationProfile.init(rawValue:)) ?? .standard
+        let profile = direction == .englishToChinese &&
+            LocalTranslationProfile.available(in: bundle).contains(preferred) ? preferred : .standard
+        do {
+            return try await performTranslation(trimmed, direction: direction, profile: profile)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch where profile != .standard {
+            return try await performTranslation(trimmed, direction: direction, profile: .standard)
+        }
+    }
+
+    private func performTranslation(
+        _ trimmed: String, direction: LocalTranslation.Direction, profile: LocalTranslationProfile
+    ) async throws -> LocalTranslation {
+        let models = try await models(for: direction, profile: profile)
         try Task.checkCancellation()
 
         do {
@@ -151,7 +221,8 @@ actor LocalTranslationService {
             let segments = try translationSegments(
                 trimmed,
                 tokenizer: models.tokenizer,
-                tokenLimit: segmentTokenLimit
+                tokenLimit: segmentTokenLimit,
+                addsSourceEnd: models.profile == .standard
             )
             var translatedSegments: [String] = []
             translatedSegments.reserveCapacity(segments.count)
@@ -199,7 +270,7 @@ actor LocalTranslationService {
         direction: LocalTranslation.Direction,
         models: LoadedModels
     ) async throws -> String {
-        var sourceIDs = models.tokenizer.encode(source)
+        var sourceIDs = models.tokenizer.encode(source, addEndOfSequence: models.profile == .standard)
         guard !sourceIDs.isEmpty, sourceIDs.count <= Self.maximumTokens else {
             throw LocalTranslationError.inputTooLong
         }
@@ -227,11 +298,12 @@ actor LocalTranslationService {
 
         let generated = try await decode(
             with: models.decoder,
-            tokenizer: models.tokenizer,
+            tokenizer: models.targetTokenizer,
+            decoderStartsWithBOS: models.profile == .quickMT,
             hiddenStates: hiddenStates,
             sourceMask: sourceMaskArray
         )
-        let translated = models.tokenizer.decode(generated)
+        let translated = models.targetTokenizer.decode(generated)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         if hasObviousOutputAnomaly(translated, original: source) {
             throw LocalTranslationError.unsafeOutput
@@ -249,9 +321,10 @@ actor LocalTranslationService {
     private func translationSegments(
         _ source: String,
         tokenizer: SentencePieceTokenizer,
-        tokenLimit: Int
+        tokenLimit: Int,
+        addsSourceEnd: Bool
     ) throws -> [String] {
-        if tokenizer.encode(source).count <= tokenLimit {
+        if tokenizer.encode(source, addEndOfSequence: addsSourceEnd).count <= tokenLimit {
             return [source]
         }
 
@@ -266,7 +339,7 @@ actor LocalTranslationService {
                 let candidate = String(remaining.prefix(middle))
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 if !candidate.isEmpty,
-                   tokenizer.encode(candidate).count <= tokenLimit {
+                   tokenizer.encode(candidate, addEndOfSequence: addsSourceEnd).count <= tokenLimit {
                     largestFittingCount = middle
                     low = middle + 1
                 } else {
@@ -310,14 +383,16 @@ actor LocalTranslationService {
         character.isWhitespace || ".!?。！？；;，,:：、".contains(character)
     }
 
-    private func models(for direction: LocalTranslation.Direction) async throws -> LoadedModels {
-        if let loadedModels, loadedModels.direction == direction {
+    private func models(
+        for direction: LocalTranslation.Direction, profile: LocalTranslationProfile
+    ) async throws -> LoadedModels {
+        if let loadedModels, loadedModels.direction == direction, loadedModels.profile == profile {
             return loadedModels
         }
 
         // Release the previous direction before loading the next large pair.
         loadedModels = nil
-        let names = modelNames(for: direction)
+        let names = modelNames(for: direction, profile: profile)
         guard let encoderURL = bundle.url(forResource: names.encoder, withExtension: "mlmodelc"),
               let decoderURL = bundle.url(forResource: names.decoder, withExtension: "mlmodelc"),
               let tokenizerURL = bundle.url(forResource: names.tokenizer, withExtension: "spmlex") else {
@@ -325,24 +400,35 @@ actor LocalTranslationService {
         }
 
         do {
-            let encoderConfiguration = MLModelConfiguration()
-            encoderConfiguration.computeUnits = .cpuAndNeuralEngine
+            let configuration = MLModelConfiguration()
+            configuration.computeUnits = profile == .quickMT
+                ? LocalTranslationProfile.quickMTComputeUnits(in: bundle)
+                : .cpuAndNeuralEngine
             let encoder = try await MLModel.load(
                 contentsOf: encoderURL,
-                configuration: encoderConfiguration
+                configuration: configuration
             )
-            let decoderConfiguration = MLModelConfiguration()
-            decoderConfiguration.computeUnits = .cpuAndNeuralEngine
             let decoder = try await MLModel.load(
                 contentsOf: decoderURL,
-                configuration: decoderConfiguration
+                configuration: configuration
             )
             let tokenizer = try SentencePieceTokenizer(contentsOf: tokenizerURL)
+            let targetTokenizer: SentencePieceTokenizer
+            if let name = names.targetTokenizer {
+                guard let url = bundle.url(forResource: name, withExtension: "spmlex") else {
+                    throw LocalTranslationError.modelMissing
+                }
+                targetTokenizer = try SentencePieceTokenizer(contentsOf: url)
+            } else {
+                targetTokenizer = tokenizer
+            }
             let loaded = LoadedModels(
                 direction: direction,
+                profile: profile,
                 encoder: encoder,
                 decoder: decoder,
-                tokenizer: tokenizer
+                tokenizer: tokenizer,
+                targetTokenizer: targetTokenizer
             )
             loadedModels = loaded
             return loaded
@@ -356,11 +442,13 @@ actor LocalTranslationService {
     private func decode(
         with decoder: MLModel,
         tokenizer: SentencePieceTokenizer,
+        decoderStartsWithBOS: Bool,
         hiddenStates: MLMultiArray,
         sourceMask: MLMultiArray
     ) async throws -> [Int32] {
         let paddingID = tokenizer.paddingTokenID
         var decoderIDs = Array(repeating: paddingID, count: Self.maximumTokens)
+        if decoderStartsWithBOS { decoderIDs[0] = tokenizer.beginningOfSequenceTokenID }
         var decoderMask = Array(repeating: Int32(0), count: Self.maximumTokens)
         decoderMask[0] = 1
 
@@ -406,8 +494,14 @@ actor LocalTranslationService {
         throw LocalTranslationError.outputTooLong
     }
 
-    private func modelNames(for direction: LocalTranslation.Direction) -> ModelNames {
-        switch direction {
+    private func modelNames(for direction: LocalTranslation.Direction, profile: LocalTranslationProfile) -> ModelNames {
+        if profile == .quickMT {
+            return ModelNames(
+                encoder: "QuickMTEncoder", decoder: "QuickMTDecoder",
+                tokenizer: "QuickMTSource", targetTokenizer: "QuickMTTarget"
+            )
+        }
+        return switch direction {
         case .chineseToEnglish:
             ModelNames(
                 encoder: "LocalZhEnEncoder",

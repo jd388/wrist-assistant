@@ -67,20 +67,27 @@ public actor ExtendedDictionaryStore {
         }
 
         do {
-            var resolvedMatches = try exactMatches(
-                for: strictKey,
-                database: database,
-                limit: max(1, suggestionLimit + 1),
-                tolerant: false
-            )
-            if resolvedMatches.isEmpty,
-               !DictionarySearchEngine.containsChinese(strictKey) {
+            var keys = [(key: strictKey, tolerant: false)]
+            if !DictionarySearchEngine.containsChinese(strictKey) {
+                keys.append((Self.tolerantLookupKey(strictKey), true))
+                if strictKey.contains(" ") {
+                    let phrase = Self.trimmingOuterPunctuation(strictKey)
+                    if !phrase.isEmpty, phrase != strictKey {
+                        keys.append((phrase, false))
+                        keys.append((Self.tolerantLookupKey(phrase), true))
+                    }
+                }
+            }
+
+            var resolvedMatches: [DictionaryMatch] = []
+            for (key, tolerant) in keys {
                 resolvedMatches = try exactMatches(
-                    for: Self.tolerantLookupKey(strictKey),
+                    for: key,
                     database: database,
                     limit: max(1, suggestionLimit + 1),
-                    tolerant: true
+                    tolerant: tolerant
                 )
+                if !resolvedMatches.isEmpty { break }
             }
             let suggestions = resolvedMatches.isEmpty
                 ? try prefixMatches(
@@ -238,7 +245,9 @@ public actor ExtendedDictionaryStore {
             return DictionarySearchEngine.normalize(folded)
         }
 
-        folded = trimmingOuterPunctuationFromSingleToken(folded)
+        if folded.rangeOfCharacter(from: .whitespacesAndNewlines) == nil {
+            folded = trimmingOuterPunctuation(folded)
+        }
 
         var result = ""
         var pendingSpace = false
@@ -260,15 +269,9 @@ public actor ExtendedDictionaryStore {
         return result
     }
 
-    private static func trimmingOuterPunctuationFromSingleToken(
-        _ value: String
-    ) -> String {
-        guard !value.unicodeScalars.contains(where: {
-            CharacterSet.whitespacesAndNewlines.contains($0)
-        }) else { return value }
-
+    private static func trimmingOuterPunctuation(_ value: String) -> String {
         let outerPunctuation = CharacterSet(
-            charactersIn: "\"“”‘’'()[]{}<>!?！？,，;；:："
+            charactersIn: "\"“”‘’'()[]{}<>!?！？,，;；:：。"
         )
         var scalars = Array(value.unicodeScalars)
         while let first = scalars.first,
@@ -293,6 +296,7 @@ public actor ExtendedDictionaryStore {
             }
         }
         return String(String.UnicodeScalarView(scalars))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static func tolerantLookupKey(_ strictKey: String) -> String {

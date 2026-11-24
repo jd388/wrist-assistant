@@ -1,12 +1,19 @@
-# Wrist Assistant · 腕上助手
+# Wrist AI · 腕上助手
 
 [简体中文](README.md) · **English**
 
 > You're halfway through an English reading passage when you come across “We need to address this problem.” You know the words, but you're still unsure what the sentence means. You can't bring your phone to school, and you don't have a dictionary pen. What if you could look it up on your wrist?
 
-Wrist Assistant grew out of that situation for middle and high school students in China. If you already have an Apple Watch and would rather skip buying a dictionary pen, you can look up `address` offline and translate the whole sentence on your watch. When your watch is online, ask DeepSeek, “Why does `address` mean ‘deal with’ here?” If you're stuck on an exercise, try “Give me a hint so I can work it out myself.”
+Wrist AI grew out of that situation for middle and high school students in China. If you already have an Apple Watch and would rather skip buying a dictionary pen, you can look up `address` offline and translate the whole sentence on your watch. When your watch is online, ask DeepSeek, “Why does `address` mean ‘deal with’ here?” If you're stuck on an exercise, try “Give me a hint so I can work it out myself.”
 
 It's also for anyone who wants to use AI on an Apple Watch. When a question comes to mind on your commute or your phone is out of reach, you can ask from your wrist and follow up in the same conversation.
+
+## 0.9.27 (66)
+
+- AI chat uses DeepSeek’s conversation title. The watch keeps a locally generated title when the API returns none.
+- The direct web reader extracts text as content arrives. It reads up to 5 MB and keeps the text and links available when the limit is reached. You can open the page in Safari or use an optional reading gateway.
+- AI answers display common mathematical and chemical notation. You can expand reasoning and search sources when enabled.
+- Watch face and Smart Stack widgets open the app or show recent favorites, dictionary lookups, or AI questions.
 
 ## What you can do on your watch
 
@@ -22,7 +29,7 @@ It's also for anyone who wants to use AI on an Apple Watch. When a question come
 
 ## Build
 
-You'll need macOS, Xcode, and the watchOS SDK. Open `WatchBrowser/WatchBrowser.xcodeproj` and select the WatchBrowser scheme. Start with a watchOS simulator, or sign with your own development team and unique bundle IDs to run on a physical watch. If you change the bundle IDs, make sure the Watch app's companion bundle identifier matches the iPhone app's bundle ID.
+You'll need macOS, Xcode, and the watchOS SDK. Open `WatchBrowser/WatchBrowser.xcodeproj` and select the WatchBrowser scheme. Start with a watchOS simulator, or sign with your own development team and unique bundle IDs to run on a physical watch. Set the project-level `IOS_COMPANION_BUNDLE_ID` to update the iPhone, Watch, and widget identifiers together.
 
 ```sh
 xcodebuild -project WatchBrowser/WatchBrowser.xcodeproj -scheme WatchBrowser \
@@ -50,4 +57,4 @@ python3 Tools/build_extended_dictionary.py Tools/Data/esdb70_coverage.tsv /path/
   LexiWatchWatchApp/Resources/offline_dictionary.json LexiWatchWatchApp/Resources/offline_dictionary_extended.sqlite
 ```
 
-If you have an Oxford MDX file you can import, use `LexiWatch/Tools/build_oxford_dictionary.py` to produce `oxford_advanced_10_zh_hans.sqlite`. Add it to your own build through Xcode's Copy Bundle Resources build phase.
+The Oxford import tool requires the Python packages `mdict-utils` and `lxml`. If you have an Oxford MDX file you can import, use `LexiWatch/Tools/build_oxford_dictionary.py` to produce `oxford_advanced_10_zh_hans.sqlite`. Add it to your own build through Xcode's Copy Bundle Resources build phase.

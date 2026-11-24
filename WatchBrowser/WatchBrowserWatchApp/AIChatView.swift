@@ -16,7 +16,6 @@ struct AIChatView: View {
     @StateObject private var model: AIChatModel
     @State private var showingConversation = false
     @State private var showingHistory = false
-    @State private var showingDictionary = false
     #if DEBUG
     @State private var hasHandledLaunchNavigation = false
     #endif
@@ -56,12 +55,11 @@ struct AIChatView: View {
             guard initialTask == .webQuestion, pageContext == nil,
                   !hasHandledLaunchNavigation else { return }
             hasHandledLaunchNavigation = true
-            if ProcessInfo.processInfo.arguments.contains("--wrist-ui-open-dictionary") {
-                showingDictionary = true
-            } else if ProcessInfo.processInfo.arguments.contains("--wrist-ui-open-history") {
+            let arguments = ProcessInfo.processInfo.arguments
+            guard !arguments.contains("--wrist-ui-open-dictionary") else { return }
+            if arguments.contains("--wrist-ui-open-history") {
                 showingHistory = true
-            } else if ProcessInfo.processInfo.arguments.contains("--wrist-ui-open-chat")
-                || ProcessInfo.processInfo.arguments.contains("--wrist-ui-open-editor") {
+            } else if arguments.contains("--wrist-ui-open-chat") || arguments.contains("--wrist-ui-open-editor") {
                 showingConversation = true
             }
         }
@@ -81,16 +79,6 @@ struct AIChatView: View {
                     .buttonStyle(.borderedProminent)
                     .tint(.cyan)
                     .accessibilityIdentifier("chat.new")
-
-                    NavigationLink {
-                        LexiWatchLookupView(ownsNavigationStack: false)
-                    } label: {
-                        WatchChatActionLabel("秒查词典", systemImage: "character.book.closed.fill")
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(Color(red: 0.35, green: 0.86, blue: 0.66))
-                    .accessibilityIdentifier("dictionary.open")
-                    .accessibilityHint("离线查词、中英翻译与单词本")
 
                     if !model.messages.isEmpty || !model.draft.isEmpty {
                         Button {
@@ -120,10 +108,7 @@ struct AIChatView: View {
                 .padding(.bottom, 8)
             }
         }
-        .navigationTitle("腕上助手")
-        .navigationDestination(isPresented: $showingDictionary) {
-            LexiWatchLookupView(ownsNavigationStack: false)
-        }
+        .navigationTitle("AI")
         .navigationDestination(isPresented: $showingConversation) {
             conversation
         }
@@ -183,6 +168,8 @@ private struct WatchChatActionLabel: View {
 private struct AIChatSessionView: View {
     @Binding private var serverURL: String
     @Binding private var accessToken: String
+    @AppStorage(AIReplyPreferenceKey.showReasoning) private var showReasoning = true
+    @AppStorage(AIReplyPreferenceKey.showSources) private var showSources = true
     private let browser: WatchRemoteBrowser?
     let pageContext: GatewayPageContext?
     let initialTask: AIChatInitialTask
@@ -190,6 +177,7 @@ private struct AIChatSessionView: View {
     @ObservedObject private var model: AIChatModel
     private let conversationID: UUID?
     @State private var expandedReasoningIDs: Set<UUID> = []
+    @State private var expandedSourceIDs: Set<UUID> = []
     @State private var deepSeekAPIKey = ""
     @State private var credentialLoadError: String?
     @State private var showingQuestionEditor = false
@@ -216,16 +204,18 @@ private struct AIChatSessionView: View {
 
     var body: some View {
         GeometryReader { geometry in
-          ScrollViewReader { proxy in
-            ScrollView {
+          AIReadingScrollView(
+            update: ReadingUpdate(message: model.messages.last, phase: model.phase, draft: model.draft),
+            answer: latestAnswerSnapshot,
+            composerDraft: model.draft, contextID: model.selectedConversationID,
+            showsReturnButton: model.messages.contains { $0.role == .user }
+          ) {
                 VStack(alignment: .leading, spacing: 10) {
                     if initialTask != .webQuestion {
                         header
                     }
 
-                    if hasAIService {
-                        modeControls
-                    } else {
+                    if !hasAIService {
                         aiServiceRequired
                     }
 
@@ -255,24 +245,6 @@ private struct AIChatSessionView: View {
                 .frame(width: max(0, geometry.size.width - 16), alignment: .leading)
                 .padding(.horizontal, 8)
                 .padding(.bottom, 8)
-            }
-            .onChange(of: model.messages.last?.text) { _, _ in
-                guard model.isAsking else { return }
-                withAnimation(.easeOut(duration: 0.16)) {
-                    proxy.scrollTo("chat-bottom", anchor: .bottom)
-                }
-            }
-            .onChange(of: model.messages.count) { _, _ in
-                proxy.scrollTo("chat-bottom", anchor: .bottom)
-            }
-            .onChange(of: model.phase) { _, phase in
-                if case .failed = phase {
-                    proxy.scrollTo("chat-status", anchor: .bottom)
-                }
-            }
-            .onAppear {
-                proxy.scrollTo("chat-bottom", anchor: .bottom)
-            }
           }
         }
         .navigationTitle(navigationTitle)
@@ -327,14 +299,16 @@ private struct AIChatSessionView: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
+    private var latestAnswerSnapshot: AIReadingAnswerSnapshot? {
+        guard let message = model.messages.last, message.role == .assistant else { return nil }
+        return AIReadingAnswerSnapshot(id: message.id, text: message.text)
+    }
+
     private var messageTimeline: some View {
         VStack(alignment: .leading, spacing: 8) {
             ForEach(model.messages) { message in
                 messageView(message)
             }
-            Color.clear
-                .frame(height: 1)
-                .id("chat-bottom")
         }
     }
 
@@ -358,14 +332,11 @@ private struct AIChatSessionView: View {
                             .foregroundStyle(.secondary)
                     }
                 } else if !message.text.isEmpty {
-                    assistantText(message)
-                        .font(.body)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .accessibilityLabel("AI 回答：\(message.text)")
+                    AIAnswerContent(text: message.text)
+                        .id("chat-answer-text-\(message.id.uuidString)")
                 }
 
-                if let reasoning = message.reasoning, !reasoning.isEmpty {
+                if showReasoning, let reasoning = message.reasoning, !reasoning.isEmpty {
                     Button {
                         withAnimation(.easeInOut(duration: 0.18)) {
                             if expandedReasoningIDs.contains(message.id) {
@@ -394,23 +365,44 @@ private struct AIChatSessionView: View {
                 }
 
                 if message.wasTruncated {
-                    Label("回答或思考内容达到显示上限，可缩小问题范围后重试。", systemImage: "scissors")
+                    Label(
+                        showReasoning
+                            ? "回答或思考内容达到显示上限，可缩小问题范围后重试。"
+                            : "内容已截断，可缩小问题范围后重试。",
+                        systemImage: "scissors"
+                    )
                         .font(.system(size: 9))
                         .foregroundStyle(.orange)
                 }
 
-                if !message.answerBasis.isEmpty {
-                    Text(message.answerBasis)
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
+                if message.status == .interrupted && message.text != "回答在完成前中断。" {
+                    Text("回答已中断")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
                 }
 
-                if !message.citations.isEmpty {
-                    Divider()
-                    Text("来源")
-                        .font(.caption.weight(.semibold))
-                    ForEach(Array(message.citations.prefix(5))) { citation in
-                        sourceLink(citation)
+                if showSources, !message.citations.isEmpty {
+                    let expanded = expandedSourceIDs.contains(message.id)
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            if expanded { expandedSourceIDs.remove(message.id) }
+                            else { expandedSourceIDs.insert(message.id) }
+                        }
+                    } label: {
+                        HStack {
+                            Label("搜索来源", systemImage: "link")
+                            Spacer(minLength: 2)
+                            Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                                .accessibilityHidden(true)
+                        }
+                    }
+                    .font(.caption.weight(.semibold))
+                    .buttonStyle(.plain)
+                    .accessibilityValue(expanded ? "已展开" : "已折叠")
+                    if expanded {
+                        ForEach(message.citations) { citation in
+                            sourceLink(citation)
+                        }
                     }
                 }
 
@@ -435,21 +427,18 @@ private struct AIChatSessionView: View {
                     .font(.caption2)
                     .buttonStyle(.bordered)
                 }
+
+                let footer = message.answerFooter
+                if !message.text.isEmpty && !footer.isEmpty {
+                    Text(footer)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("chat.answerModel")
+                }
             }
             .padding(9)
             .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
         }
-    }
-
-    private func assistantText(_ message: AIConversationMessage) -> Text {
-        guard message.status == .completed,
-              let attributed = try? AttributedString(
-                  markdown: message.text,
-                  options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-              ) else {
-            return Text(message.text)
-        }
-        return Text(attributed)
     }
 
     private func sourceLink(_ citation: GatewayCitation) -> some View {
@@ -472,43 +461,6 @@ private struct AIChatSessionView: View {
                 .buttonStyle(.bordered)
             }
         }
-    }
-
-    private var modeControls: some View {
-        HStack(spacing: 6) {
-            if initialTask == .webQuestion {
-                modeButton(
-                    title: "联网",
-                    systemImage: "globe",
-                    enabled: model.webSearchEnabled
-                ) {
-                    model.setWebSearchEnabled(!model.webSearchEnabled)
-                }
-            }
-            modeButton(
-                title: "深思",
-                systemImage: "brain.head.profile",
-                enabled: model.deepThinkingEnabled
-            ) {
-                model.setDeepThinkingEnabled(!model.deepThinkingEnabled)
-            }
-        }
-    }
-
-    private func modeButton(
-        title: String,
-        systemImage: String,
-        enabled: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Label(title, systemImage: enabled ? "checkmark.circle.fill" : systemImage)
-                .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(.bordered)
-        .tint(enabled ? .cyan : .gray)
-        .disabled(model.isAsking)
-        .accessibilityValue(enabled ? "已开启" : "已关闭")
     }
 
     @ViewBuilder
@@ -534,50 +486,63 @@ private struct AIChatSessionView: View {
     }
 
     private var composer: some View {
-        HStack(spacing: 6) {
+        Group {
             if model.isAsking {
-                ProgressView()
-                    .controlSize(.small)
-                Text("正在回答…")
-                    .font(.caption)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Button(role: .cancel) {
-                    model.cancel()
-                } label: {
-                    Image(systemName: "stop.circle.fill")
-                        .font(.title2)
-                        .frame(width: 44, height: 44)
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("正在回答…")
+                        .font(.caption)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Button(role: .cancel) {
+                        model.cancel()
+                    } label: {
+                        Image(systemName: "stop.circle.fill")
+                            .font(.title2)
+                            .frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("停止回答")
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("停止回答")
             } else {
-                TextField(
-                    model.messages.isEmpty ? "输入问题" : "继续提问",
-                    text: $model.draft,
-                    axis: .vertical
-                )
-                .font(.body)
-                .lineLimit(1...4)
-                .focused($isComposerFocused)
-                .submitLabel(.done)
-                .onSubmit {
-                    isComposerFocused = false
-                    model.saveDraft()
-                }
-                .accessibilityIdentifier("chat.followup")
-                .frame(maxWidth: .infinity, minHeight: 44)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .bottom, spacing: 6) {
+                        TextField(
+                            model.messages.isEmpty ? "输入问题" : "继续提问",
+                            text: $model.draft,
+                            axis: .vertical
+                        )
+                        .font(.body)
+                        .lineLimit(1...)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .focused($isComposerFocused)
+                        .submitLabel(.done)
+                        .onSubmit {
+                            isComposerFocused = false
+                            model.saveDraft()
+                        }
+                        .accessibilityIdentifier("chat.followup")
+                        .frame(maxWidth: .infinity, minHeight: 44)
 
-                Button {
-                    sendDraft()
-                } label: {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.title2)
-                        .frame(width: 44, height: 44)
+                        Button {
+                            sendDraft()
+                        } label: {
+                            Image(systemName: "arrow.up.circle.fill")
+                                .font(.title2)
+                                .frame(width: 44, height: 44)
+                        }
+                        .buttonStyle(.plain)
+                        .tint(.cyan)
+                        .disabled(!model.canSendDraft || model.questionEdit != nil)
+                        .accessibilityLabel("发送问题")
+                    }
+
+                    if model.isDraftTooLong {
+                        Text("问题太长，请精简后再发送。")
+                            .font(.caption2)
+                            .foregroundStyle(.orange)
+                    }
                 }
-                .buttonStyle(.plain)
-                .tint(.cyan)
-                .disabled(!model.canSendDraft || model.questionEdit != nil)
-                .accessibilityLabel("发送问题")
             }
         }
         .frame(maxWidth: .infinity, minHeight: 44)
@@ -702,7 +667,8 @@ private struct AIQuestionEditView: View {
                     TextField("修改问题", text: $model.questionEditDraft, axis: .vertical)
                         .focused($isQuestionFocused)
                         .font(.body)
-                        .lineLimit(2...5)
+                        .lineLimit(2...)
+                        .fixedSize(horizontal: false, vertical: true)
                         .submitLabel(.done)
                         .accessibilityIdentifier("chat.edit.question")
 
@@ -929,3 +895,354 @@ private struct AIConversationHistoryView: View {
         }
     }
 }
+
+
+private struct ReadingUpdate: Equatable {
+    let message: AIConversationMessage?
+    let phase: AIChatModel.Phase
+    let draft: String
+}
+
+/// Shared by the actual conversation and the isolated, offline acceptance fixture.
+private struct AIReadingScrollView<Update: Equatable, Content: View>: View {
+    let update: Update
+    var answer: AIReadingAnswerSnapshot? = nil
+    var composerDraft = ""
+    var contextID: UUID? = nil
+    var showsReturnButton = true
+    @ViewBuilder let content: () -> Content
+    @State private var follow = AIReadingFollowState()
+    @State private var followsAnswerText = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var answerTextAnchor: String? {
+        guard let answer, !answer.text.isEmpty else { return nil }
+        return "chat-answer-text-\(answer.id.uuidString)"
+    }
+
+    private var automaticScrollTarget: String {
+        followsAnswerText ? (answerTextAnchor ?? "chat-bottom") : "chat-bottom"
+    }
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(spacing: 0) {
+                    Color.clear.frame(height: 1).id("chat-top")
+                    content()
+                    Color.clear.frame(height: 1).id("chat-bottom")
+                }
+            }
+            .onScrollGeometryChange(for: ReadingGeometry.self) { geometry in
+                ReadingGeometry(
+                    distance: AIReadingFollowState.distanceFromBottom(contentHeight: geometry.contentSize.height,
+                        bottomInset: geometry.contentInsets.bottom, visibleBottom: geometry.visibleRect.maxY),
+                    height: geometry.contentSize.height, offset: geometry.contentOffset.y,
+                    container: geometry.containerSize.height, inset: geometry.contentInsets.bottom,
+                    topInset: geometry.contentInsets.top, visibleBottom: geometry.visibleRect.maxY
+                )
+            } action: { old, new in
+                follow.updateGeometry(distanceFromBottom: new.distance)
+                #if DEBUG
+                ReadingQARecorder.record("geometry", distance: new.distance, height: new.height, follows: follow.shouldFollowUpdates, offset: new.offset, container: new.container, inset: new.inset, topInset: new.topInset, visibleBottom: new.visibleBottom)
+                #endif
+                if (old.height != new.height || old.container != new.container || old.inset != new.inset), follow.shouldFollowUpdates {
+                    proxy.scrollTo(automaticScrollTarget, anchor: .bottom)
+                }
+            }
+            .onScrollPhaseChange { _, phase, context in
+                switch phase {
+                case .interacting, .decelerating:
+                    follow.beginUserScroll()
+                case .idle:
+                    if follow.isUserScrolling {
+                        let geometry = context.geometry
+                        follow.endUserScroll(distanceFromBottom: AIReadingFollowState.distanceFromBottom(
+                            contentHeight: geometry.contentSize.height, bottomInset: geometry.contentInsets.bottom,
+                            visibleBottom: geometry.visibleRect.maxY))
+                    }
+                default: break
+                }
+                #if DEBUG
+                ReadingQARecorder.record("phase-\(phase)", distance: AIReadingFollowState.distanceFromBottom(
+                    contentHeight: context.geometry.contentSize.height, bottomInset: context.geometry.contentInsets.bottom,
+                    visibleBottom: context.geometry.visibleRect.maxY), follows: follow.shouldFollowUpdates)
+                #endif
+            }
+            .onChange(of: update) { _, _ in
+                #if DEBUG
+                ReadingQARecorder.record("content", distance: 0, follows: follow.shouldFollowUpdates)
+                #endif
+                if follow.shouldFollowUpdates { proxy.scrollTo(automaticScrollTarget, anchor: .bottom) }
+            }
+            .onChange(of: answer?.id) { _, _ in
+                followsAnswerText = false
+            }
+            .onChange(of: composerDraft) { _, _ in
+                followsAnswerText = false
+                if follow.shouldFollowUpdates { proxy.scrollTo("chat-bottom", anchor: .bottom) }
+            }
+            .onChange(of: contextID) { _, _ in
+                followsAnswerText = false
+                follow = AIReadingFollowState()
+                proxy.scrollTo("chat-bottom", anchor: .bottom)
+            }
+            .onAppear {
+                followsAnswerText = false
+                follow = AIReadingFollowState()
+                #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("--wrist-reading-qa-layout") {
+                    follow.beginUserScroll()
+                    follow.endUserScroll(distanceFromBottom: 1_000)
+                    proxy.scrollTo("chat-top", anchor: .top)
+                    return
+                }
+                #endif
+                proxy.scrollTo("chat-bottom", anchor: .bottom)
+            }
+            .toolbar {
+                if showsReturnButton {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            followsAnswerText = true
+                            follow.returnToLatest()
+                            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
+                                proxy.scrollTo(answerTextAnchor ?? "chat-bottom", anchor: .bottom)
+                            }
+                            #if DEBUG
+                            ReadingQARecorder.record("return", distance: 0, follows: follow.shouldFollowUpdates)
+                            #endif
+                        } label: {
+                            Image(systemName: "arrow.down")
+                        }
+                        .accessibilityLabel("回到最新")
+                        .accessibilityIdentifier("chat.returnToLatest")
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct ReadingGeometry: Equatable {
+    let distance: Double
+    let height: Double
+    let offset: Double
+    let container: Double
+    let inset: Double
+    let topInset: Double
+    let visibleBottom: Double
+}
+
+private struct AIAnswerContent: View {
+    let text: String
+    private var blocks: [AIAnswerBlock] { AIAnswerDocument.parse(text) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
+                blockView(block)
+            }
+        }
+        .font(.body)
+        .lineSpacing(3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("AI 回答")
+        .accessibilityIdentifier("chat.answer")
+    }
+
+    @ViewBuilder private func blockView(_ block: AIAnswerBlock) -> some View {
+        switch block.kind {
+        case .paragraph:
+            inline(block.text)
+                .lineSpacing(3)
+        case .heading(let level):
+            inline(block.text)
+                .font(level <= 2 ? .headline : .body.weight(.semibold))
+                .padding(.top, 4)
+                .accessibilityAddTraits(.isHeader)
+        case .listItem(let marker, let depth):
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(marker).foregroundStyle(.secondary)
+                inline(block.text).frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.leading, CGFloat(depth) * 8)
+        case .quote:
+            HStack(alignment: .top, spacing: 8) {
+                RoundedRectangle(cornerRadius: 1).fill(.cyan.opacity(0.7)).frame(width: 2)
+                inline(block.text).foregroundStyle(.secondary)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+        case .code(let language):
+            VStack(alignment: .leading, spacing: 5) {
+                if !language.isEmpty { Text(language).font(.caption2).foregroundStyle(.secondary) }
+                // Wrap rather than introducing a second horizontal scroll gesture.
+                Text(block.text).font(.system(.caption, design: .monospaced))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(8)
+            .background(.black.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
+        case .math:
+            inline(block.text)
+                .font(AIMathText.containsGrid(block.text)
+                      ? .system(.callout, design: .monospaced)
+                      : .system(.body, design: .serif))
+                .lineSpacing(4)
+                .padding(.vertical, 2)
+                .fixedSize(horizontal: false, vertical: true)
+        case .tableRecord:
+            VStack(alignment: .leading, spacing: 7) {
+                ForEach(Array(block.fields.enumerated()), id: \.offset) { _, field in
+                    VStack(alignment: .leading, spacing: 2) {
+                        inline(field.name).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                        inline(field.value)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 4)
+            .overlay(alignment: .bottom) { Divider().offset(y: 4) }
+        case .divider:
+            Divider()
+        }
+    }
+
+    private func inline(_ text: String) -> Text {
+        Text(AIMathText.attributed(text, decorateFormula: Self.formulaText))
+    }
+
+    private static func formulaText(_ string: String, attributes: AttributeContainer) -> AttributedString {
+        var result = AttributedString()
+        var plain = ""
+        for character in string {
+            guard let script = AIMathText.scriptGlyph(character) else {
+                plain.append(character)
+                continue
+            }
+            if !plain.isEmpty {
+                result += AttributedString(plain, attributes: attributes)
+                plain.removeAll(keepingCapacity: true)
+            }
+            var digit = AttributedString(String(script.character), attributes: attributes)
+            digit.font = .system(.caption2, design: .serif)
+            digit.baselineOffset = script.isSuperscript ? 5 : -3
+            result += digit
+        }
+        result += AttributedString(plain, attributes: attributes)
+        return result
+    }
+}
+
+#if DEBUG
+private enum ReadingQARecorder {
+    static func record(_ event: String, distance: Double, height: Double = 0, follows: Bool, offset: Double = 0, container: Double = 0, inset: Double = 0, topInset: Double = 0, visibleBottom: Double = 0) {
+        guard ProcessInfo.processInfo.arguments.contains("--wrist-reading-qa"),
+              let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
+        let url = directory.appendingPathComponent("reading-qa.jsonl")
+        let record: [String: Any] = ["event": event, "time": Date().timeIntervalSince1970,
+            "distance": distance, "height": height, "follows": follows,
+            "offset": offset, "container": container, "inset": inset, "topInset": topInset, "visibleBottom": visibleBottom]
+        guard var data = try? JSONSerialization.data(withJSONObject: record) else { return }
+        data.append(10)
+        if !FileManager.default.fileExists(atPath: url.path) { FileManager.default.createFile(atPath: url.path, contents: nil) }
+        guard let file = try? FileHandle(forWritingTo: url) else { return }
+        defer { try? file.close() }
+        _ = try? file.seekToEnd()
+        try? file.write(contentsOf: data)
+    }
+}
+
+private struct QAReadingUpdate: Equatable {
+    let text: String
+    let running: Bool
+    let draft: String
+}
+
+/// No model, store, credentials or network client is constructed in this route.
+struct AIReadingAcceptanceView: View {
+    @State private var text = ""
+    @State private var running = false
+    @State private var answerID = UUID()
+    @State private var qaDraft = ""
+    private let sample = """
+    # 抬腕就能读懂
+
+    这是一段用于验收的本地长回答。**重点用粗体**，正文按段落呈现；生成中也保持同样的排版。
+
+    ## 三个步骤
+    1. 开始阅读，检查标题与正文的层级。
+    2. 向上滚动，后续文字不应把阅读位置拉走。
+    3. 点回到最新，继续跟随回答。
+
+    > 阅读应该由你控制。引用内容与正文有明确区分。
+
+    ## 逐项比较
+    | 功能 | 作用 |
+    | --- | --- |
+    | 自动跟随 | 停在底部时跟随新增内容 |
+    | 自由阅读 | 向上翻阅后保持当前位置 |
+
+    ## 代码示例
+    ```swift
+    let message = "在小屏上自动换行，保留代码中的符号与缩进"
+    print(message)
+    ```
+
+    ## 后续内容
+    """
+
+    var body: some View {
+        NavigationStack {
+            AIReadingScrollView(
+                update: QAReadingUpdate(text: text, running: running, draft: qaDraft),
+                answer: AIReadingAnswerSnapshot(id: answerID, text: text),
+                composerDraft: qaDraft, contextID: answerID
+            ) {
+                VStack(alignment: .leading, spacing: 10) {
+                    if !text.isEmpty {
+                        AIAnswerContent(text: text)
+                            .id("chat-answer-text-\(answerID.uuidString)")
+                            .padding(9)
+                            .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                    }
+                    TextField("输入问题", text: $qaDraft, axis: .vertical)
+                        .lineLimit(1...)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(minHeight: 44)
+                        .accessibilityIdentifier("qa.composer")
+                    Button(running ? "停止本地生成" : "继续本地生成") { running.toggle() }
+                        .accessibilityIdentifier("qa.stream")
+                    Text("本地验收 · 无网络请求").font(.caption2).foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 8)
+            }
+            .navigationTitle("阅读验收")
+            .task {
+                if ProcessInfo.processInfo.arguments.contains("--qa-empty") { return }
+                if ProcessInfo.processInfo.arguments.contains("--wrist-reading-qa-layout") {
+                    let arguments = ProcessInfo.processInfo.arguments
+                    if arguments.contains("--qa-table"), let range = sample.range(of: "## 逐项比较") {
+                        text = String(sample[range.lowerBound...].components(separatedBy: "## 代码示例")[0])
+                    } else if arguments.contains("--qa-code"), let range = sample.range(of: "## 代码示例") {
+                        text = String(sample[range.lowerBound...].components(separatedBy: "## 后续内容")[0])
+                    } else {
+                        text = sample
+                    }
+                    return
+                }
+                text = sample + String(repeating: "\n\n新增段落：转动表冠或滑动屏幕阅读。正在生成的文字不会打断你查看前面的内容。", count: 5)
+            }
+            .task(id: running) {
+                guard running else { return }
+                for index in 1...120 {
+                    do { try await Task.sleep(for: .milliseconds(1000)) } catch { return }
+                    text += index.isMultiple(of: 4) ? "\n\n第\(index / 4)段：这是后续生成的内容。" : "新的文字继续到达。"
+                }
+                running = false
+            }
+        }
+    }
+}
+#endif
